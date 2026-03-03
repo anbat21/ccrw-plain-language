@@ -1,0 +1,29 @@
+# Environment variables (local only - Azure uses portal config)
+.env
+.env.local
+.env.*.local
+
+# Dependencies (Azure will install these)
+node_modules/
+
+# Build output (commit dist for Azure - it needs the built files!)
+# IMPORTANT: dist/ should be committed for Azure deployment
+# Uncomment the line below ONLY for development, keep it commented for deployment:
+# dist/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# Office Add-in certificates
+certs/
+
+# OS files
+Thumbs.db
