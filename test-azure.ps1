@@ -1,80 +1,137 @@
-# Azure Deployment Diagnostic & Fix Script
-# App URL: https://ccrw-plain-language-e4eaeyc9c6gdesah.canadacentral-01.azurewebsites.net
+param(
+    [string]$AppName = "ccrw-plain-language-e4eaeyc9c6gdesah",
+    [string]$AppUrl = "https://ccrw-plain-language-e4eaeyc9c6gdesah.canadacentral-01.azurewebsites.net",
+    [string]$LocalUrl = "http://localhost:3000"
+)
 
-Write-Host "================================================" -ForegroundColor Cyan
-Write-Host "Azure App Service Diagnostics" -ForegroundColor Cyan
-Write-Host "================================================" -ForegroundColor Cyan
-Write-Host ""
+$scmHost = "$AppName.scm.azurewebsites.net"
+$scmUrl = "https://$scmHost"
 
-$appName = "ccrw-plain-language-e4eaeyc9c6gdesah"
-$appUrl = "https://ccrw-plain-language-e4eaeyc9c6gdesah.canadacentral-01.azurewebsites.net"
-
-# Test 1: Can we reach the app?
-Write-Host "[1/6] Testing connectivity..." -ForegroundColor Yellow
 try {
-    $response = Invoke-WebRequest -Uri "$appUrl/health" -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
-    Write-Host "  OK App is responding!" -ForegroundColor Green
-    Write-Host "  Status: $($response.StatusCode)" -ForegroundColor Green
-    Write-Host "  Response: $($response.Content)" -ForegroundColor Green
-} catch {
-    Write-Host "  ERROR App is NOT responding" -ForegroundColor Red
-    Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "  This means the app crashed or was not deployed." -ForegroundColor Red
+    $appUri = [Uri]$AppUrl
+    $hostParts = $appUri.Host.Split('.')
+    if ($hostParts.Length -ge 2) {
+        $scmHost = "$($hostParts[0]).scm.$($hostParts[1..($hostParts.Length - 1)] -join '.')"
+        $scmUrl = "https://$scmHost"
+    }
 }
-Write-Host ""
+catch {
+}
 
-# Test 2: Check if files were deployed
-Write-Host "[2/6] Checking Kudu (Advanced Tools)..." -ForegroundColor Yellow
-Write-Host "  Open: https://$appName.scm.azurewebsites.net" -ForegroundColor Cyan
-Write-Host "  Then: Debug Console > PowerShell" -ForegroundColor Cyan
-Write-Host "  Navigate to: D:\home\site\wwwroot" -ForegroundColor Cyan
-Write-Host "  Run: ls" -ForegroundColor Cyan
-Write-Host "  You should see: server.js, package.json, dist/" -ForegroundColor Cyan
-Write-Host ""
+$results = [System.Collections.Generic.List[object]]::new()
 
-# Test 3: Check logs
-Write-Host "[3/6] How to view logs:" -ForegroundColor Yellow
-Write-Host "  Option A: Azure Portal > Your App > Log stream" -ForegroundColor Cyan
-Write-Host "  Option B: Azure Portal > Your App > Deployment Center > Logs" -ForegroundColor Cyan
-Write-Host ""
+function Add-Result {
+    param(
+        [string]$Name,
+        [bool]$Passed,
+        [string]$Detail
+    )
+    $results.Add([PSCustomObject]@{
+        Check  = $Name
+        Result = if ($Passed) { "PASS" } else { "FAIL" }
+        Detail = $Detail
+    })
+}
 
-# Test 4: Configuration check
-Write-Host "[4/6] Required Azure Portal Configuration:" -ForegroundColor Yellow
-Write-Host "  Configuration > General Settings:" -ForegroundColor Cyan
-Write-Host "    - Startup command: node server.js" -ForegroundColor White
-Write-Host ""
-Write-Host "  Configuration > Application settings (must have):" -ForegroundColor Cyan
-Write-Host "    - REACT_APP_DIRECT_LINE_SECRET = (your bot secret)" -ForegroundColor White
-Write-Host "    - SCM_DO_BUILD_DURING_DEPLOYMENT = true" -ForegroundColor White
-Write-Host "    - WEBSITE_NODE_DEFAULT_VERSION = ~20" -ForegroundColor White
-Write-Host ""
+function Test-Http {
+    param(
+        [string]$Name,
+        [string]$Url,
+        [int]$TimeoutSec = 10,
+        [scriptblock]$Validator,
+        [switch]$AllowAuthChallenge
+    )
 
-# Test 5: Common issues
-Write-Host "[5/6] Common Deployment Issues:" -ForegroundColor Yellow
-Write-Host "  Issue A: 'Application Error' = App crashed on startup" -ForegroundColor Red
-Write-Host "    Fix: Check Log stream for error message" -ForegroundColor Green
-Write-Host ""
-Write-Host "  Issue B: 'Cannot find module' = npm install didn't run" -ForegroundColor Red
-Write-Host "    Fix: Set SCM_DO_BUILD_DURING_DEPLOYMENT=true" -ForegroundColor Green
-Write-Host ""
-Write-Host "  Issue C: Package.json error" -ForegroundColor Red
-Write-Host "    Fix: Remove prestart script (already done)" -ForegroundColor Green
-Write-Host ""
-
-# Test 6: Quick deploy check
-Write-Host "[6/6] Quick Deploy Checklist:" -ForegroundColor Yellow
-Write-Host "  [ ] Files committed to Git?" -ForegroundColor White
-Write-Host "  [ ] Pushed to Azure remote?" -ForegroundColor White
-Write-Host "  [ ] Startup command set?" -ForegroundColor White
-Write-Host "  [ ] REACT_APP_DIRECT_LINE_SECRET set?" -ForegroundColor White
-Write-Host "  [ ] Checked deployment logs?" -ForegroundColor White
-Write-Host ""
+    try {
+        $resp = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec $TimeoutSec -ErrorAction Stop
+        if ($Validator) {
+            $isOk = & $Validator $resp
+            if ($isOk) {
+                Add-Result -Name $Name -Passed $true -Detail "HTTP $($resp.StatusCode)"
+            } else {
+                Add-Result -Name $Name -Passed $false -Detail "HTTP $($resp.StatusCode), unexpected content"
+            }
+        } else {
+            Add-Result -Name $Name -Passed $true -Detail "HTTP $($resp.StatusCode)"
+        }
+    }
+    catch {
+        if ($AllowAuthChallenge -and $_.Exception.Response -and ($_.Exception.Response.StatusCode.value__ -in 401, 403)) {
+            Add-Result -Name $Name -Passed $true -Detail "HTTP $($_.Exception.Response.StatusCode.value__) (auth challenge)"
+        } else {
+            Add-Result -Name $Name -Passed $false -Detail $_.Exception.Message
+        }
+    }
+}
 
 Write-Host "================================================" -ForegroundColor Cyan
-Write-Host "Next Steps" -ForegroundColor Cyan
+Write-Host "Local + Azure Verifier" -ForegroundColor Cyan
 Write-Host "================================================" -ForegroundColor Cyan
-Write-Host "1. Open Kudu console to verify files exist" -ForegroundColor White
-Write-Host "2. Check Log stream for real error message" -ForegroundColor White
-Write-Host "3. Verify startup command and env vars" -ForegroundColor White
-Write-Host "4. If nothing deployed, run: git push azure main" -ForegroundColor White
+Write-Host "Local: $LocalUrl"
+Write-Host "Azure: $AppUrl"
+Write-Host "SCM:   $scmUrl"
 Write-Host ""
+
+Test-Http -Name "Local /health" -Url "$LocalUrl/health" -TimeoutSec 5 -Validator {
+    param($resp)
+    $resp.Content -match '"status"\s*:\s*"OK"'
+}
+
+Test-Http -Name "Local /api/get-token" -Url "$LocalUrl/api/get-token" -TimeoutSec 8 -Validator {
+    param($resp)
+    $json = $resp.Content | ConvertFrom-Json
+    -not [string]::IsNullOrWhiteSpace($json.token)
+}
+
+Test-Http -Name "Local /taskpane.html" -Url "$LocalUrl/taskpane.html" -TimeoutSec 5 -Validator {
+    param($resp)
+    $resp.Content -match '<html|<title|taskpane'
+}
+
+try {
+    $dns = Resolve-DnsName -Name $scmHost -Type A -ErrorAction Stop | Select-Object -First 1
+    Add-Result -Name "SCM DNS resolve" -Passed $true -Detail "Resolved to $($dns.IPAddress)"
+}
+catch {
+    Add-Result -Name "SCM DNS resolve" -Passed $false -Detail $_.Exception.Message
+}
+
+Test-Http -Name "Azure /health" -Url "$AppUrl/health" -TimeoutSec 10 -Validator {
+    param($resp)
+    $resp.Content -match '"status"\s*:\s*"OK"'
+}
+
+Test-Http -Name "Azure /" -Url "$AppUrl/" -TimeoutSec 10
+
+Test-Http -Name "SCM root" -Url $scmUrl -TimeoutSec 10 -AllowAuthChallenge
+
+Write-Host ""
+Write-Host "================================================" -ForegroundColor Cyan
+Write-Host "Results" -ForegroundColor Cyan
+Write-Host "================================================" -ForegroundColor Cyan
+
+$results | Format-Table -AutoSize
+
+$failed = $results | Where-Object { $_.Result -eq "FAIL" }
+
+Write-Host ""
+if ($failed.Count -eq 0) {
+    Write-Host "All checks passed." -ForegroundColor Green
+    exit 0
+}
+
+Write-Host "One or more checks failed." -ForegroundColor Yellow
+
+if ($failed.Check -contains "Azure /health" -or $failed.Check -contains "Azure /") {
+    Write-Host "- Azure app is not serving expected responses. Check App Service status + Log stream." -ForegroundColor Yellow
+}
+
+if ($failed.Check -contains "SCM root") {
+    Write-Host "- SCM endpoint unreachable. Verify App Service exists/running and network access." -ForegroundColor Yellow
+}
+
+if ($failed.Check -contains "Local /health" -or $failed.Check -contains "Local /api/get-token") {
+    Write-Host "- Local server may be down. Start it with: npm start" -ForegroundColor Yellow
+}
+
+exit 1
