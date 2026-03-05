@@ -370,7 +370,7 @@ export default function App() {
             <Input
               placeholder="Write one sentence that captures the topic and main message"
               value={aud.topicMainMessage}
-              onChange={(_, d) => setAud({ ...aud, topicMainMessage: d.value })}
+              onChange={(_, d) => setAud((prev) => ({ ...prev, topicMainMessage: d.value }))}
             />
           </Field>
 
@@ -386,12 +386,12 @@ export default function App() {
               value={aud.audienceType}
               onChange={(_, d) => {
                 const nextType = d.value as "Internal" | "External";
-                setAud({
-                  ...aud,
+                setAud((prev) => ({
+                  ...prev,
                   audienceType: nextType,
                   primaryAudience: "",
                   secondaryAudience: ""
-                });
+                }));
               }}
             >
               <Radio value="Internal" label="Internal" />
@@ -410,7 +410,7 @@ export default function App() {
               placeholder={aud.audienceType ? "Select an audience..." : "Select an audience type first"}
               disabled={!aud.audienceType}
               selectedOptions={aud.primaryAudience ? [aud.primaryAudience] : []}
-              onOptionSelect={(_, d) => setAud({ ...aud, primaryAudience: d.optionText ?? "" })}
+              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, primaryAudience: d.optionText ?? "" }))}
             >
               {primaryAudienceOptions.map((opt) => (
                 <Option key={opt} value={opt}>{opt}</Option>
@@ -428,7 +428,7 @@ export default function App() {
               placeholder={aud.audienceType ? "Select an audience, or leave blank" : "Select an audience type first"}
               disabled={!aud.audienceType}
               selectedOptions={aud.secondaryAudience ? [aud.secondaryAudience] : []}
-              onOptionSelect={(_, d) => setAud({ ...aud, secondaryAudience: d.optionText ?? "" })}
+              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, secondaryAudience: d.optionText ?? "" }))}
             >
               <Option key="none" value="">
                 No secondary audience
@@ -450,7 +450,7 @@ export default function App() {
             <Dropdown
               placeholder="Select one..."
               selectedOptions={aud.whereReadUse ? [aud.whereReadUse] : []}
-              onOptionSelect={(_, d) => setAud({ ...aud, whereReadUse: d.optionText ?? "" })}
+              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, whereReadUse: d.optionText ?? "" }))}
             >
               <Option>Web page, public website</Option>
               <Option>Portal, logged in website</Option>
@@ -473,7 +473,7 @@ export default function App() {
             <Dropdown
               placeholder="Select one..."
               selectedOptions={aud.whatCreating ? [aud.whatCreating] : []}
-              onOptionSelect={(_, d) => setAud({ ...aud, whatCreating: d.optionText ?? "" })}
+              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, whatCreating: d.optionText ?? "" }))}
             >
               <Option>Email</Option>
               <Option>Intranet page</Option>
@@ -504,7 +504,7 @@ export default function App() {
             <Dropdown
               placeholder="Select one..."
               selectedOptions={aud.timing ? [aud.timing] : []}
-              onOptionSelect={(_, d) => setAud({ ...aud, timing: d.optionText ?? "" })}
+              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, timing: d.optionText ?? "" }))}
             >
               <Option>One time announcement</Option>
               <Option>Ongoing reference content</Option>
@@ -524,7 +524,7 @@ export default function App() {
             <Textarea
               placeholder="The audience is looking for..."
               value={aud.infoNeed}
-              onChange={(_, d) => setAud({ ...aud, infoNeed: d.value })}
+              onChange={(_, d) => setAud((prev) => ({ ...prev, infoNeed: d.value }))}
             />
           </Field>
 
@@ -538,7 +538,7 @@ export default function App() {
             <Textarea
               placeholder="I want the audience to understand..."
               value={aud.infoUnderstand}
-              onChange={(_, d) => setAud({ ...aud, infoUnderstand: d.value })}
+              onChange={(_, d) => setAud((prev) => ({ ...prev, infoUnderstand: d.value }))}
             />
           </Field>
 
@@ -552,7 +552,7 @@ export default function App() {
             <Dropdown
               placeholder="Select one..."
               selectedOptions={aud.audienceDo ? [aud.audienceDo] : []}
-              onOptionSelect={(_, d) => setAud({ ...aud, audienceDo: d.optionText ?? "" })}
+              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, audienceDo: d.optionText ?? "" }))}
             >
               <Option>Take an action</Option>
               <Option>Make a decision</Option>
