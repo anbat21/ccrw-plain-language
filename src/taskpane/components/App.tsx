@@ -30,6 +30,7 @@ const useStyles = makeStyles({
   },
   headerText: { color: "#0b1f37", marginBottom: "5px" },
   helperText: { marginBottom: "10px", color: "#333" },
+  fieldHintText: { display: "block", marginBottom: "6px", color: "#5f5f5f" },
   issueItem: { 
     borderLeft: "4px solid #0b1f37", 
     padding: "10px", 
@@ -362,8 +363,10 @@ export default function App() {
           <Field
             label="What is the topic and main message in one sentence?"
             required
-            hint="Provide a brief introduction to the information you are communicating."
           >
+            <Text size={200} className={styles.fieldHintText}>
+              Provide a brief introduction to the information you are communicating.
+            </Text>
             <Input
               placeholder="Write one sentence that captures the topic and main message"
               value={aud.topicMainMessage}
@@ -374,8 +377,10 @@ export default function App() {
           <Field
             label="Audience Type"
             required
-            hint="Indicate whether this communication is for an internal or external audience."
           >
+            <Text size={200} className={styles.fieldHintText}>
+              Indicate whether this communication is for an internal or external audience.
+            </Text>
             <RadioGroup
               layout="horizontal"
               value={aud.audienceType}
@@ -397,8 +402,10 @@ export default function App() {
           <Field
             label="Who is the primary audience?"
             required
-            hint="This is the primary consumer of the information you are communicating."
           >
+            <Text size={200} className={styles.fieldHintText}>
+              This is the primary consumer of the information you are communicating.
+            </Text>
             <Dropdown
               placeholder={aud.audienceType ? "Select an audience..." : "Select an audience type first"}
               disabled={!aud.audienceType}
@@ -413,8 +420,10 @@ export default function App() {
 
           <Field
             label="Who is the secondary audience?"
-            hint="This is another audience who will be receiving this information, but they are not the primary group you are communicating with."
           >
+            <Text size={200} className={styles.fieldHintText}>
+              This is another audience who will be receiving this information, but they are not the primary group you are communicating with.
+            </Text>
             <Dropdown
               placeholder={aud.audienceType ? "Select an audience, or leave blank" : "Select an audience type first"}
               disabled={!aud.audienceType}
@@ -434,8 +443,10 @@ export default function App() {
           <Field
             label="Where will people read or use this information?"
             required
-            hint="This is how the communication will be presented."
           >
+            <Text size={200} className={styles.fieldHintText}>
+              This is how the communication will be presented.
+            </Text>
             <Dropdown
               placeholder="Select one..."
               selectedOptions={aud.whereReadUse ? [aud.whereReadUse] : []}
@@ -455,8 +466,10 @@ export default function App() {
           <Field
             label="What are you creating?"
             required
-            hint="This is the type of communication you are developing."
           >
+            <Text size={200} className={styles.fieldHintText}>
+              This is the type of communication you are developing.
+            </Text>
             <Dropdown
               placeholder="Select one..."
               selectedOptions={aud.whatCreating ? [aud.whatCreating] : []}
@@ -484,8 +497,10 @@ export default function App() {
           <Field
             label="Timing of Communication"
             required
-            hint="This helps identify the context of when this information is being communicated to the audience."
           >
+            <Text size={200} className={styles.fieldHintText}>
+              This helps identify the context of when this information is being communicated to the audience.
+            </Text>
             <Dropdown
               placeholder="Select one..."
               selectedOptions={aud.timing ? [aud.timing] : []}
@@ -502,8 +517,10 @@ export default function App() {
           <Field
             label="What information does the audience need or want?"
             required
-            hint="Describe what it is that you audience is looking for."
           >
+            <Text size={200} className={styles.fieldHintText}>
+              Describe what it is that your audience is looking for.
+            </Text>
             <Textarea
               placeholder="The audience is looking for..."
               value={aud.infoNeed}
@@ -514,8 +531,10 @@ export default function App() {
           <Field
             label="What information do you want the audience to understand?"
             required
-            hint="Describe what it is that you want your audience to know after consuming this information."
           >
+            <Text size={200} className={styles.fieldHintText}>
+              Describe what it is that you want your audience to know after consuming this information.
+            </Text>
             <Textarea
               placeholder="I want the audience to understand..."
               value={aud.infoUnderstand}
@@ -526,8 +545,10 @@ export default function App() {
           <Field
             label="What does the audience need to do with this information?"
             required
-            hint="Select the option that matches the next steps the audience has to take after receiving this information."
           >
+            <Text size={200} className={styles.fieldHintText}>
+              Select the option that matches the next steps the audience has to take after receiving this information.
+            </Text>
             <Dropdown
               placeholder="Select one..."
               selectedOptions={aud.audienceDo ? [aud.audienceDo] : []}
