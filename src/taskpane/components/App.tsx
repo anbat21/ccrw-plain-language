@@ -1,12 +1,12 @@
 /* global Word */
 import * as React from "react";
 import { 
-  Button, Text, Field, Dropdown, Option, RadioGroup, Radio, 
+  Button, Text, Field, Dropdown, Option, RadioGroup, Radio, Input,
   makeStyles, tokens, Spinner, Card, Textarea, Divider
 } from "@fluentui/react-components";
 import { DirectLine } from "botframework-directlinejs";
 
-// Professional Styling: Purple and White Theme [cite: 1262, 1387]
+// Professional Styling: Dark Navy and White Theme
 const useStyles = makeStyles({
   container: { 
     padding: "20px", 
@@ -18,39 +18,92 @@ const useStyles = makeStyles({
   },
   setupCard: { 
     padding: "20px", 
-    borderTop: "6px solid #6200EE", 
+    borderTop: "6px solid #0b1f37", 
     boxShadow: tokens.shadow16 
   },
   primaryButton: { 
-    backgroundColor: "#6200EE", 
+    backgroundColor: "#0b1f37", 
     color: "white", 
     marginTop: "10px",
-    ":hover": { backgroundColor: "#4B0082" },
-    ":disabled": { backgroundColor: tokens.colorNeutralBackgroundDisabled }
+    ":hover": { backgroundColor: "#092033" },
+    ":disabled": { backgroundColor: "#0b1f37", opacity: 0.55 }
   },
-  headerText: { color: "#6200EE", marginBottom: "5px" },
+  headerText: { color: "#0b1f37", marginBottom: "5px" },
+  helperText: { marginBottom: "10px", color: "#333" },
   issueItem: { 
-    borderLeft: "4px solid #9C27B0", 
+    borderLeft: "4px solid #0b1f37", 
     padding: "10px", 
     marginBottom: "10px", 
     backgroundColor: "white" 
   }
 });
 
-// Context Interface based on Section 10.5 of the Standard 
-interface AudienceContext {
+// Audience Setup State Type
+type AudienceType = "" | "Internal" | "External";
+
+type AudienceSetup = {
+  topicMainMessage: string;
+  audienceType: AudienceType;
   primaryAudience: string;
-  secondaryAudience: string;
-  urgency: string;      // Mandatory (10.5 f)
-  attitudes: string;    // Mandatory (10.5 a)
-  context: string;      // Mandatory (10.5 b)
-  format: string;       // Mandatory (10.5 c)
-  informationNeed: string; // Mandatory (10.5 d)
-  informationMostImportant: string; // Mandatory (10.5 d)
-  informationMustUnderstand: string; // Mandatory (10.5 d)
-  purpose: string;      // Mandatory (10.5 e)
-  purposeUse: string;   // Mandatory (10.5 e)
-}
+  secondaryAudience: string; // optional
+  whereReadUse: string;
+  whatCreating: string;
+  timing: string;
+  infoNeed: string;
+  infoUnderstand: string;
+  audienceDo: string;
+};
+
+// Conditional audience options by type
+const audienceOptionsByType: Record<"Internal" | "External", string[]> = {
+  Internal: [
+    "All employees",
+    "Frontline staff",
+    "People leaders",
+    "Executives",
+    "HR and People and Culture",
+    "IT and Digital",
+    "Finance",
+    "Operations",
+    "Legal",
+    "Communications and marketing",
+    "Training, learning and development",
+    "New hires",
+    "Volunteers, Casual workers"
+  ],
+  External: [
+    "Clients, service users",
+    "Job seekers, candidates",
+    "Employers, customers",
+    "Partners, vendors, funders",
+    "Public, community members",
+    "Government, regulators"
+  ]
+};
+
+// Helper function to build audience context for the AI engine
+const buildAudienceContext = (aud: AudienceSetup) => {
+  const lines: string[] = [];
+
+  lines.push(`The topic and main message of this communication is, ${aud.topicMainMessage}.`);
+  lines.push(`This communication is for an ${aud.audienceType} audience to the organization.`);
+  lines.push(`The primary audience for this communication is ${aud.primaryAudience}.`);
+
+  if (aud.secondaryAudience) {
+    lines.push(`The secondary audience for this communication is ${aud.secondaryAudience}.`);
+  } else {
+    lines.push(`There is no secondary audience for this communication.`);
+  }
+
+  lines.push(`The information will be presented through a ${aud.whereReadUse}.`);
+  lines.push(`This information is being presented in a ${aud.whatCreating}.`);
+  lines.push(`The timing and context for this communication is ${aud.timing}.`);
+  lines.push(`The audience is looking for ${aud.infoNeed}.`);
+  lines.push(`The author wants the audience to understand, ${aud.infoUnderstand}.`);
+  lines.push(`After receiving this information, the audience will need to ${aud.audienceDo}.`);
+
+  return lines.join("\n");
+};
 
 export default function App() {
   const styles = useStyles();
@@ -98,34 +151,37 @@ export default function App() {
     startBot();
   }, []);
 
-  // Initialization Form Data [cite: 541, 602]
-  const [aud, setAud] = React.useState<AudienceContext>({
+  // Initialization Form Data
+  const [aud, setAud] = React.useState<AudienceSetup>({
+    topicMainMessage: "",
+    audienceType: "",
     primaryAudience: "",
     secondaryAudience: "",
-    urgency: "",
-    attitudes: "",
-    context: "",
-    format: "",
-    informationNeed: "",
-    informationMostImportant: "",
-    informationMustUnderstand: "",
-    purpose: ""
-    ,purposeUse: ""
+    whereReadUse: "",
+    whatCreating: "",
+    timing: "",
+    infoNeed: "",
+    infoUnderstand: "",
+    audienceDo: ""
   });
 
-  // FORM VALIDATION: Check if any required field is empty [cite: 1510, 1537]
-  const isFormValid = 
-    aud.primaryAudience !== "" && 
-    aud.secondaryAudience.trim().length > 0 &&
-    aud.urgency !== "" && 
-    aud.attitudes.trim().length > 5 && 
-    aud.context !== "" && 
-    aud.format !== "" &&
-    aud.informationNeed.trim().length > 5 &&
-    aud.informationMostImportant.trim().length > 5 &&
-    aud.informationMustUnderstand.trim().length > 5 &&
-    aud.purpose !== "" &&
-    aud.purposeUse.trim().length > 5;
+  // Derived audience options based on selected type
+  const primaryAudienceOptions =
+    aud.audienceType ? audienceOptionsByType[aud.audienceType] : [];
+  const secondaryAudienceOptions =
+    aud.audienceType ? audienceOptionsByType[aud.audienceType] : [];
+
+  // FORM VALIDATION: Secondary audience is optional
+  const isFormValid =
+    aud.topicMainMessage.trim().length > 0 &&
+    !!aud.audienceType &&
+    !!aud.primaryAudience &&
+    !!aud.whereReadUse &&
+    !!aud.whatCreating &&
+    !!aud.timing &&
+    aud.infoNeed.trim().length > 0 &&
+    aud.infoUnderstand.trim().length > 0 &&
+    !!aud.audienceDo;
 
   const validatePlan = (data: any) => {
     if (!data || data.version !== "1.0" || data.scope !== "selection" || !Array.isArray(data.items) || !data.summary) {
@@ -173,6 +229,9 @@ export default function App() {
           return;
         }
 
+        // Build audience context for the AI engine
+        const audienceContext = buildAudienceContext(aud);
+
         // Feed context and text to the Brain
         const data: any = await new Promise((resolve, reject) => {
           const sub = directLine.activity$.subscribe(act => {
@@ -197,7 +256,7 @@ export default function App() {
             `Return ONLY a strict JSON object with this schema:\n` +
             `{"version":"1.0","scope":"selection","plainnessScore":0,"items":[{"id":"A1","type":"highlight","match":{"strategy":"exactText","text":"..."},"style":{"color":"yellow"},"note":{"label":"Plain language","message":"Replace with 'use' for clarity"}}],"summary":{"total":0,"categories":{}}}\n` +
             `Do NOT include any extra text or markdown.\n` +
-            `[CONTEXT: PrimaryAudience=${aud.primaryAudience}, SecondaryAudience=${aud.secondaryAudience}, Ages=16-65, Attitudes=${aud.attitudes}, Context=${aud.context}, Format=${aud.format}, InformationNeed=${aud.informationNeed}, InformationMostImportant=${aud.informationMostImportant}, InformationMustUnderstand=${aud.informationMustUnderstand}, Purpose=${aud.purpose}, PurposeUse=${aud.purposeUse}, Urgency=${aud.urgency}]\n` +
+            `[CONTEXT]\n${audienceContext}\n` +
             `Analyze this selection and output JSON only:\n${selection.text}`;
           directLine.postActivity({ from: { id: "user" }, type: "message", text: prompt }).subscribe({
             error: (sendErr: any) => {
@@ -288,114 +347,221 @@ export default function App() {
   return (
     <div className={styles.container}>
       {!isReady ? (
-        /* STEP 1: INITIALIZATION FORM [cite: 42, 533] */
+        /* STEP 1: AUDIENCE SETUP FORM */
         <Card className={styles.setupCard}>
-          <Text size={500} weight="bold" className={styles.headerText}>Audience Setup</Text>
-          <Text size={200}>Required per CAN-ASC-3.1:2025 Section 10</Text>
+          <Text size={500} weight="bold" className={styles.headerText}>
+            Audience Setup
+          </Text>
+
+          <Text size={200} className={styles.helperText}>
+            Text is only in plain language if it is tailored to its intended audience. Complete the form below to ensure that your recommendations are tailored for your intended audience.
+          </Text>
+
           <Divider />
 
-          <Field label="Who is the primary audience? " required>
-            <Dropdown placeholder="Select audience..." onOptionSelect={(_, d) => setAud({...aud, primaryAudience: d.optionText!})}>
-              <Option>Clients/Newcomers</Option>
-              <Option>Internal Staff</Option>
-              <Option>General Public</Option>
-            </Dropdown>
-          </Field>
-
-          <Field label="Who is the secondary audience? " required>
-            <Textarea 
-              placeholder="e.g., Caregivers, family members, managers..." 
-              value={aud.secondaryAudience}
-              onChange={(_, d) => setAud({...aud, secondaryAudience: d.value})} 
+          <Field
+            label="What is the topic and main message in one sentence?"
+            required
+            hint="Provide a brief introduction to the information you are communicating."
+          >
+            <Input
+              placeholder="Write one sentence that captures the topic and main message"
+              value={aud.topicMainMessage}
+              onChange={(_, d) => setAud({ ...aud, topicMainMessage: d.value })}
             />
           </Field>
 
-          <Field label="Urgency Level" required>
-            <RadioGroup layout="horizontal" onChange={(_, d) => setAud({...aud, urgency: d.value})}>
-              <Radio value="Low" label="Low" />
-              <Radio value="High" label="High" />
+          <Field
+            label="Audience Type"
+            required
+            hint="Indicate whether this communication is for an internal or external audience."
+          >
+            <RadioGroup
+              layout="horizontal"
+              value={aud.audienceType}
+              onChange={(_, d) => {
+                const nextType = d.value as "Internal" | "External";
+                setAud({
+                  ...aud,
+                  audienceType: nextType,
+                  primaryAudience: "",
+                  secondaryAudience: ""
+                });
+              }}
+            >
+              <Radio value="Internal" label="Internal" />
+              <Radio value="External" label="External" />
             </RadioGroup>
           </Field>
 
-          <Field label="Audience Attitudes/Concerns" required>
-            <Textarea 
-              placeholder="e.g., Stressed about services..." 
-              value={aud.attitudes}
-              onChange={(_, d) => setAud({...aud, attitudes: d.value})} 
-            />
-          </Field>
-
-          <Field label="Context/Platform" required>
-            <Dropdown placeholder="Where will they read this?" onOptionSelect={(_, d) => setAud({...aud, context: d.optionText!})}>
-              <Option>Mobile Device</Option>
-              <Option>Public Signage</Option>
-              <Option>Official Document</Option>
-            </Dropdown>
-          </Field>
-
-          <Field label="Format preference" required>
-            <Dropdown placeholder="Preferred format" onOptionSelect={(_, d) => setAud({...aud, format: d.optionText!})}>
-              <Option>Short paragraphs</Option>
-              <Option>Bulleted list</Option>
-              <Option>Step-by-step instructions</Option>
-            </Dropdown>
-          </Field>
-
-          <Field label="Information the audience needs or wants" required>
-            <Textarea 
-              placeholder="What do they need to know?" 
-              value={aud.informationNeed}
-              onChange={(_, d) => setAud({...aud, informationNeed: d.value})} 
-            />
-          </Field>
-
-          <Field label="Most important information" required>
-            <Textarea 
-              placeholder="What matters most to them?" 
-              value={aud.informationMostImportant}
-              onChange={(_, d) => setAud({...aud, informationMostImportant: d.value})} 
-            />
-          </Field>
-
-          <Field label="Information they must understand" required>
-            <Textarea 
-              placeholder="What must be understood?" 
-              value={aud.informationMustUnderstand}
-              onChange={(_, d) => setAud({...aud, informationMustUnderstand: d.value})} 
-            />
-          </Field>
-
-          <Field label="Primary Purpose" required>
-            <Dropdown placeholder="What is the goal?" onOptionSelect={(_, d) => setAud({...aud, purpose: d.optionText!})}>
-              <Option>Instructions</Option>
-              <Option>Notification</Option>
-              <Option>Legal Compliance</Option>
-            </Dropdown>
-          </Field>
-
-          <Field label="Purpose and expected use" required>
-            <Textarea 
-              placeholder="How should they use the information?" 
-              value={aud.purposeUse}
-              onChange={(_, d) => setAud({...aud, purposeUse: d.value})} 
-            />
-          </Field>
-
-          <Button 
-            className={styles.primaryButton} 
-            disabled={!isFormValid} // BLOCK START IF EMPTY [cite: 1537]
-            onClick={() => { setIsReady(true); }}
+          <Field
+            label="Who is the primary audience?"
+            required
+            hint="This is the primary consumer of the information you are communicating."
           >
-            Continue to Analysis
+            <Dropdown
+              placeholder={aud.audienceType ? "Select an audience..." : "Select an audience type first"}
+              disabled={!aud.audienceType}
+              selectedOptions={aud.primaryAudience ? [aud.primaryAudience] : []}
+              onOptionSelect={(_, d) => setAud({ ...aud, primaryAudience: d.optionText ?? "" })}
+            >
+              {primaryAudienceOptions.map((opt) => (
+                <Option key={opt} value={opt}>{opt}</Option>
+              ))}
+            </Dropdown>
+          </Field>
+
+          <Field
+            label="Who is the secondary audience?"
+            hint="This is another audience who will be receiving this information, but they are not the primary group you are communicating with."
+          >
+            <Dropdown
+              placeholder={aud.audienceType ? "Select an audience, or leave blank" : "Select an audience type first"}
+              disabled={!aud.audienceType}
+              selectedOptions={aud.secondaryAudience ? [aud.secondaryAudience] : []}
+              onOptionSelect={(_, d) => setAud({ ...aud, secondaryAudience: d.optionText ?? "" })}
+            >
+              <Option key="none" value="">
+                No secondary audience
+              </Option>
+
+              {secondaryAudienceOptions.map((opt) => (
+                <Option key={opt} value={opt}>{opt}</Option>
+              ))}
+            </Dropdown>
+          </Field>
+
+          <Field
+            label="Where will people read or use this information?"
+            required
+            hint="This is how the communication will be presented."
+          >
+            <Dropdown
+              placeholder="Select one..."
+              selectedOptions={aud.whereReadUse ? [aud.whereReadUse] : []}
+              onOptionSelect={(_, d) => setAud({ ...aud, whereReadUse: d.optionText ?? "" })}
+            >
+              <Option>Web page, public website</Option>
+              <Option>Portal, logged in website</Option>
+              <Option>PDF attachment</Option>
+              <Option>Printed handout, mailed letter</Option>
+              <Option>Poster, signage</Option>
+              <Option>Mobile app screen</Option>
+              <Option>Chatbot response, virtual assistant response</Option>
+              <Option>Call script, phone script</Option>
+            </Dropdown>
+          </Field>
+
+          <Field
+            label="What are you creating?"
+            required
+            hint="This is the type of communication you are developing."
+          >
+            <Dropdown
+              placeholder="Select one..."
+              selectedOptions={aud.whatCreating ? [aud.whatCreating] : []}
+              onOptionSelect={(_, d) => setAud({ ...aud, whatCreating: d.optionText ?? "" })}
+            >
+              <Option>Email</Option>
+              <Option>Intranet page</Option>
+              <Option>Chat</Option>
+              <Option>Newsletter</Option>
+              <Option>Policy manual, employee handbook</Option>
+              <Option>Procedure</Option>
+              <Option>Form</Option>
+              <Option>Memo</Option>
+              <Option>Report</Option>
+              <Option>Job posting</Option>
+              <Option>Training guide</Option>
+              <Option>FAQ</Option>
+              <Option>Customer letter</Option>
+              <Option>Press release</Option>
+              <Option>Meeting agenda</Option>
+              <Option>Slide notes</Option>
+            </Dropdown>
+          </Field>
+
+          <Field
+            label="Timing of Communication"
+            required
+            hint="This helps identify the context of when this information is being communicated to the audience."
+          >
+            <Dropdown
+              placeholder="Select one..."
+              selectedOptions={aud.timing ? [aud.timing] : []}
+              onOptionSelect={(_, d) => setAud({ ...aud, timing: d.optionText ?? "" })}
+            >
+              <Option>One time announcement</Option>
+              <Option>Ongoing reference content</Option>
+              <Option>Time sensitive update</Option>
+              <Option>Compliance deadline, safety critical</Option>
+              <Option>High emotion context, benefits, health, accommodation, discipline</Option>
+            </Dropdown>
+          </Field>
+
+          <Field
+            label="What information does the audience need or want?"
+            required
+            hint="Describe what it is that you audience is looking for."
+          >
+            <Textarea
+              placeholder="The audience is looking for..."
+              value={aud.infoNeed}
+              onChange={(_, d) => setAud({ ...aud, infoNeed: d.value })}
+            />
+          </Field>
+
+          <Field
+            label="What information do you want the audience to understand?"
+            required
+            hint="Describe what it is that you want your audience to know after consuming this information."
+          >
+            <Textarea
+              placeholder="I want the audience to understand..."
+              value={aud.infoUnderstand}
+              onChange={(_, d) => setAud({ ...aud, infoUnderstand: d.value })}
+            />
+          </Field>
+
+          <Field
+            label="What does the audience need to do with this information?"
+            required
+            hint="Select the option that matches the next steps the audience has to take after receiving this information."
+          >
+            <Dropdown
+              placeholder="Select one..."
+              selectedOptions={aud.audienceDo ? [aud.audienceDo] : []}
+              onOptionSelect={(_, d) => setAud({ ...aud, audienceDo: d.optionText ?? "" })}
+            >
+              <Option>Take an action</Option>
+              <Option>Make a decision</Option>
+              <Option>Follow steps or a process</Option>
+              <Option>Know it for reference later</Option>
+              <Option>Share it with someone else</Option>
+              <Option>Ask for help or request something</Option>
+            </Dropdown>
+          </Field>
+
+          <Button
+            className={styles.primaryButton}
+            disabled={!isFormValid}
+            onClick={() => setIsReady(true)}
+          >
+            Start Analysis
           </Button>
-          {!isFormValid && <Text size={100} italic>Please complete all required fields.</Text>}
+
+          {!isFormValid && (
+            <Text size={100} italic>
+              Please complete all required fields.
+            </Text>
+          )}
         </Card>
       ) : (
         /* STEP 2: ANALYSIS INTERFACE */
         <>
           <Card className={styles.setupCard}>
             <Button appearance="subtle" onClick={() => setIsReady(false)}>← Change Audience</Button>
-            <Text block weight="semibold" style={{color: "#6200EE"}}>Target: {aud.primaryAudience}</Text>
+            <Text block weight="semibold" style={{color: "#0b1f37"}}>Target: {aud.primaryAudience}</Text>
             <Text block size={200}>Bot: {botStatus}</Text>
             <Button 
               className={styles.primaryButton} 
@@ -420,7 +586,7 @@ export default function App() {
 
           {results?.items.map((issue: any, i: number) => (
             <Card key={i} className={styles.issueItem}>
-              <Text weight="bold" style={{color: "#9C27B0"}}>Issue #{i + 1}</Text>
+              <Text weight="bold" style={{color: "#0b1f37"}}>Issue #{i + 1}</Text>
               <Text block italic>"{issue.match.text}"</Text>
               <Text block size={200}>{issue.note.message}</Text>
               <Text block size={100}>Category: {issue.note.label || "Unlabeled"}</Text>
