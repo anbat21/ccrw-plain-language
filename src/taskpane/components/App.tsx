@@ -409,8 +409,9 @@ export default function App() {
             <Dropdown
               placeholder={aud.audienceType ? "Select an audience..." : "Select an audience type first"}
               disabled={!aud.audienceType}
+              value={aud.primaryAudience}
               selectedOptions={aud.primaryAudience ? [aud.primaryAudience] : []}
-              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, primaryAudience: d.optionText ?? "" }))}
+              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, primaryAudience: d.selectedOptions[0] ?? "" }))}
             >
               {primaryAudienceOptions.map((opt) => (
                 <Option key={opt} value={opt}>{opt}</Option>
@@ -427,8 +428,9 @@ export default function App() {
             <Dropdown
               placeholder={aud.audienceType ? "Select an audience, or leave blank" : "Select an audience type first"}
               disabled={!aud.audienceType}
+              value={aud.secondaryAudience}
               selectedOptions={aud.secondaryAudience ? [aud.secondaryAudience] : []}
-              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, secondaryAudience: d.optionText ?? "" }))}
+              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, secondaryAudience: d.selectedOptions[0] ?? "" }))}
             >
               <Option key="none" value="">
                 No secondary audience
@@ -449,17 +451,18 @@ export default function App() {
             </Text>
             <Dropdown
               placeholder="Select one..."
+              value={aud.whereReadUse}
               selectedOptions={aud.whereReadUse ? [aud.whereReadUse] : []}
-              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, whereReadUse: d.optionText ?? "" }))}
+              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, whereReadUse: d.selectedOptions[0] ?? "" }))}
             >
-              <Option>Web page, public website</Option>
-              <Option>Portal, logged in website</Option>
-              <Option>PDF attachment</Option>
-              <Option>Printed handout, mailed letter</Option>
-              <Option>Poster, signage</Option>
-              <Option>Mobile app screen</Option>
-              <Option>Chatbot response, virtual assistant response</Option>
-              <Option>Call script, phone script</Option>
+              <Option value="Web page, public website">Web page, public website</Option>
+              <Option value="Portal, logged in website">Portal, logged in website</Option>
+              <Option value="PDF attachment">PDF attachment</Option>
+              <Option value="Printed handout, mailed letter">Printed handout, mailed letter</Option>
+              <Option value="Poster, signage">Poster, signage</Option>
+              <Option value="Mobile app screen">Mobile app screen</Option>
+              <Option value="Chatbot response, virtual assistant response">Chatbot response, virtual assistant response</Option>
+              <Option value="Call script, phone script">Call script, phone script</Option>
             </Dropdown>
           </Field>
 
@@ -472,25 +475,26 @@ export default function App() {
             </Text>
             <Dropdown
               placeholder="Select one..."
+              value={aud.whatCreating}
               selectedOptions={aud.whatCreating ? [aud.whatCreating] : []}
-              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, whatCreating: d.optionText ?? "" }))}
+              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, whatCreating: d.selectedOptions[0] ?? "" }))}
             >
-              <Option>Email</Option>
-              <Option>Intranet page</Option>
-              <Option>Chat</Option>
-              <Option>Newsletter</Option>
-              <Option>Policy manual, employee handbook</Option>
-              <Option>Procedure</Option>
-              <Option>Form</Option>
-              <Option>Memo</Option>
-              <Option>Report</Option>
-              <Option>Job posting</Option>
-              <Option>Training guide</Option>
-              <Option>FAQ</Option>
-              <Option>Customer letter</Option>
-              <Option>Press release</Option>
-              <Option>Meeting agenda</Option>
-              <Option>Slide notes</Option>
+              <Option value="Email">Email</Option>
+              <Option value="Intranet page">Intranet page</Option>
+              <Option value="Chat">Chat</Option>
+              <Option value="Newsletter">Newsletter</Option>
+              <Option value="Policy manual, employee handbook">Policy manual, employee handbook</Option>
+              <Option value="Procedure">Procedure</Option>
+              <Option value="Form">Form</Option>
+              <Option value="Memo">Memo</Option>
+              <Option value="Report">Report</Option>
+              <Option value="Job posting">Job posting</Option>
+              <Option value="Training guide">Training guide</Option>
+              <Option value="FAQ">FAQ</Option>
+              <Option value="Customer letter">Customer letter</Option>
+              <Option value="Press release">Press release</Option>
+              <Option value="Meeting agenda">Meeting agenda</Option>
+              <Option value="Slide notes">Slide notes</Option>
             </Dropdown>
           </Field>
 
@@ -503,14 +507,15 @@ export default function App() {
             </Text>
             <Dropdown
               placeholder="Select one..."
+              value={aud.timing}
               selectedOptions={aud.timing ? [aud.timing] : []}
-              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, timing: d.optionText ?? "" }))}
+              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, timing: d.selectedOptions[0] ?? "" }))}
             >
-              <Option>One time announcement</Option>
-              <Option>Ongoing reference content</Option>
-              <Option>Time sensitive update</Option>
-              <Option>Compliance deadline, safety critical</Option>
-              <Option>High emotion context, benefits, health, accommodation, discipline</Option>
+              <Option value="One time announcement">One time announcement</Option>
+              <Option value="Ongoing reference content">Ongoing reference content</Option>
+              <Option value="Time sensitive update">Time sensitive update</Option>
+              <Option value="Compliance deadline, safety critical">Compliance deadline, safety critical</Option>
+              <Option value="High emotion context, benefits, health, accommodation, discipline">High emotion context, benefits, health, accommodation, discipline</Option>
             </Dropdown>
           </Field>
 
@@ -551,15 +556,16 @@ export default function App() {
             </Text>
             <Dropdown
               placeholder="Select one..."
+              value={aud.audienceDo}
               selectedOptions={aud.audienceDo ? [aud.audienceDo] : []}
-              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, audienceDo: d.optionText ?? "" }))}
+              onOptionSelect={(_, d) => setAud((prev) => ({ ...prev, audienceDo: d.selectedOptions[0] ?? "" }))}
             >
-              <Option>Take an action</Option>
-              <Option>Make a decision</Option>
-              <Option>Follow steps or a process</Option>
-              <Option>Know it for reference later</Option>
-              <Option>Share it with someone else</Option>
-              <Option>Ask for help or request something</Option>
+              <Option value="Take an action">Take an action</Option>
+              <Option value="Make a decision">Make a decision</Option>
+              <Option value="Follow steps or a process">Follow steps or a process</Option>
+              <Option value="Know it for reference later">Know it for reference later</Option>
+              <Option value="Share it with someone else">Share it with someone else</Option>
+              <Option value="Ask for help or request something">Ask for help or request something</Option>
             </Dropdown>
           </Field>
 
