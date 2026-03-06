@@ -251,13 +251,44 @@ export default function App() {
             }
           });
 
-          const prompt = `You are the AI Analysis Engine for the CCRW Plain Language Reviewer.\n` +
-            `Use ONLY the CAN-ASC-3.1:2025 document as your source.\n` +
-            `Focus on: sentence length (max 12 words), passive voice, jargon/complex terminology.\n` +
-            `Return ONLY a strict JSON object with this schema:\n` +
-            `{"version":"1.0","scope":"selection","plainnessScore":0,"items":[{"id":"A1","type":"highlight","match":{"strategy":"exactText","text":"..."},"style":{"color":"yellow"},"note":{"label":"Plain language","message":"Replace with 'use' for clarity"}}],"summary":{"total":0,"categories":{}}}\n` +
-            `Do NOT include any extra text or markdown.\n` +
-            `[CONTEXT]\n${audienceContext}\n` +
+          const prompt = `You are the AI Analysis Engine for the CCRW Plain Language Reviewer. Return ONLY JSON.\n\n` +
+            `Analyze the text for:\n` +
+            `1) Passive voice (suggest active alternative)\n` +
+            `2) Long sentences (>12 words) (suggest how to split)\n` +
+            `3) Complex jargon (suggest simpler words)\n\n` +
+            `Add on barrier checks, always run these even if the user does not disclose needs:\n` +
+            `4) Contextless clarity (language and comprehension barriers)\n` +
+            `   - If the sentence uses "this/that/it/they" or other unclear references, replace with a specific noun.\n` +
+            `   - If the sentence uses an acronym or shorthand, define it in place the first time.\n\n` +
+            `5) Cognitive load (memory, attention, and processing barriers)\n` +
+            `   - If one sentence contains multiple required actions or stacked conditions, split into separate sentences, one action each.\n` +
+            `   - If a deadline exists, keep it in the same sentence as the action it applies to.\n\n` +
+            `6) Neutral tone (emotional and distress-related barriers)\n` +
+            `   - If the sentence includes blame, shame, or threat language, rewrite as a neutral status plus next step.\n\n` +
+            `7) Findability (information access and navigation barriers)\n` +
+            `   - If the sentence points to "here/above/below/click here/more info" without a destination cue, rewrite with descriptive link text or a searchable label.\n\n` +
+            `8) Format independence (visual, hearing, and format barriers)\n` +
+            `   - If the sentence relies on visuals or audio, add a short text equivalent, and remove color or position-only directions.\n\n` +
+            `9) Usable digital steps (digital and interactive accessibility barriers)\n` +
+            `   - If the sentence gives vague portal or form instructions, name the field, button label, and expected input format.\n\n` +
+            `Rules:\n` +
+            `- EVERY issue must include the exact phrase from input text in match.text.\n` +
+            `- EVERY note.message must contain a specific replacement suggestion, not just advice.\n` +
+            `- Include a category label in note.label.\n` +
+            `- Output must be STRICT JSON only.\n\n` +
+            `Category labels to use in note.label:\n` +
+            `- "passive-voice"\n` +
+            `- "sentence-length"\n` +
+            `- "jargon"\n` +
+            `- "context-clarity"\n` +
+            `- "cognitive-load"\n` +
+            `- "distress-tone"\n` +
+            `- "navigation"\n` +
+            `- "format"\n` +
+            `- "digital-instructions"\n\n` +
+            `Return ONLY this JSON schema:\n` +
+            `{"version":"1.0","scope":"selection","plainnessScore":0,"items":[{"id":"A1","type":"highlight","match":{"strategy":"exactText","text":"EXACT_PHRASE"},"style":{"color":"yellow"},"note":{"label":"sentence-length","message":"Replace with 'First sentence... Second sentence...' for clarity"}}],"summary":{"total":1,"categories":{"passive-voice":0,"sentence-length":0,"jargon":0,"context-clarity":0,"cognitive-load":0,"distress-tone":0,"navigation":0,"format":0,"digital-instructions":0}}}\n\n` +
+            `[CONTEXT]\n${audienceContext}\n\n` +
             `Analyze this selection and output JSON only:\n${selection.text}`;
           directLine.postActivity({ from: { id: "user" }, type: "message", text: prompt }).subscribe({
             error: (sendErr: any) => {
@@ -298,7 +329,7 @@ export default function App() {
     }
 
     setLoading(true);
-    setStatus("Applying highlights and notes...");
+    setStatus("Applying replacements...");
     setSkipped([]);
     setAppliedCount(0);
 
@@ -322,20 +353,32 @@ export default function App() {
           }
 
           const range = ranges.items[0];
-          range.font.highlightColor = "Yellow";
-          const label = item.note?.label || "Note";
           const message = item.note?.message || "";
-          range.insertText(` [${label}, ${message}]`, "After");
-          applied += 1;
+          
+          // Parse suggestion from message (e.g., "Replace with 'xyz' for clarity")
+          const suggestionMatch = message.match(/Replace with ['"](.+?)['"]|Replace with: ['"](.+?)['"]/i);
+          const suggestion = suggestionMatch ? (suggestionMatch[1] || suggestionMatch[2]) : null;
+
+          if (suggestion) {
+            // Replace the text with suggestion
+            range.insertText(suggestion, "Replace");
+            applied += 1;
+          } else {
+            // Fallback: highlight + insert comment if no parseable suggestion
+            range.font.highlightColor = "Yellow";
+            const label = item.note?.label || "Note";
+            range.insertText(` [${label}: ${message}]`, "After");
+            applied += 1;
+          }
         }
 
         await context.sync();
         setAppliedCount(applied);
         setSkipped(localSkipped);
         if (localSkipped.length > 0) {
-          setStatus(`Applied ${applied}. Skipped ${localSkipped.length}.`);
+          setStatus(`Applied ${applied} replacements. Skipped ${localSkipped.length}.`);
         } else {
-          setStatus(`Applied ${applied} highlights and notes.`);
+          setStatus(`Applied ${applied} replacements successfully.`);
         }
       });
     } catch (err) {
