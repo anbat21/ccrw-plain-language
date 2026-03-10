@@ -126,17 +126,31 @@ export default function App() {
   const [appliedCount, setAppliedCount] = React.useState(0);
   const [directLine, setDirectLine] = React.useState<any>(null);
   const [botStatus, setBotStatus] = React.useState<string>("Connecting to bot...");
+  const [isBotConnected, setIsBotConnected] = React.useState(false);
   const [selectedIssueIds, setSelectedIssueIds] = React.useState<Set<number>>(new Set());
   const directLineRef = React.useRef<any>(null);
   const connectionSubRef = React.useRef<any>(null);
   const reconnectingRef = React.useRef(false);
   const reconnectAttemptsRef = React.useRef(0);
 
+  const toggleIssueSelection = React.useCallback((issueIndex: number) => {
+    setSelectedIssueIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(issueIndex)) {
+        next.delete(issueIndex);
+      } else {
+        next.add(issueIndex);
+      }
+      return next;
+    });
+  }, []);
+
   const connectBot = React.useCallback(async (isReconnect = false) => {
     try {
       // Call the internal API created in server.js to get a fresh short-lived token
       const res = await fetch('/api/get-token');
       if (!res.ok) {
+        setIsBotConnected(false);
         setBotStatus(`Error: Token API failed (${res.status})`);
         setStatus("Bot connection failed. Check server and /api/get-token.");
         return false;
@@ -144,6 +158,7 @@ export default function App() {
 
       const { token } = await res.json();
       if (!token) {
+        setIsBotConnected(false);
         setBotStatus("Error: No token received");
         setStatus("Bot connection failed. Token response was empty.");
         return false;
@@ -164,18 +179,22 @@ export default function App() {
 
       directLineRef.current = dl;
       setDirectLine(dl);
-      reconnectAttemptsRef.current = 0;
-      setBotStatus("Bot connected");
-      setStatus(isReconnect ? "Bot reconnected with a fresh token." : "System Ready.");
+      setIsBotConnected(false);
+      setBotStatus(isReconnect ? "Bot reconnecting..." : "Connecting to bot...");
+      setStatus(isReconnect ? "Refreshing token and reconnecting..." : "System Ready.");
 
       connectionSubRef.current = dl.connectionStatus$.subscribe((connectionStatus: number) => {
         // 2=Online, 3=ExpiredToken, 4=FailedToConnect, 5=Ended
         if (connectionStatus === 2) {
+          reconnectAttemptsRef.current = 0;
+          setIsBotConnected(true);
           setBotStatus("Bot connected");
+          setStatus(isReconnect ? "Bot reconnected with a fresh token." : "System Ready.");
           return;
         }
 
         if (connectionStatus === 3 || connectionStatus === 4 || connectionStatus === 5) {
+          setIsBotConnected(false);
           if (reconnectingRef.current) {
             return;
           }
@@ -200,6 +219,7 @@ export default function App() {
       return true;
     } catch (error) {
       console.error("Error initializing bot:", error);
+      setIsBotConnected(false);
       setBotStatus("Error: Bot connection failed");
       setStatus("Bot connection failed. Check server and secret configuration.");
       return false;
@@ -287,7 +307,7 @@ export default function App() {
   };
 
   const analyzeSelection = async () => {
-    if (!directLine) {
+    if (!directLine || !isBotConnected) {
       setStatus("Bot not connected yet. Please wait...");
       return;
     }
@@ -424,13 +444,14 @@ export default function App() {
     setAppliedCount(0);
 
     try {
+      let applied = 0;
+      let localSkipped: { text: string; reason: string }[] = [];
+      const appliedIndices = new Set<number>();
+
       await Word.run(async (context) => {
         const selection = context.document.getSelection();
         selection.load("text");
         await context.sync();
-
-        const localSkipped: { text: string; reason: string }[] = [];
-        let applied = 0;
 
         for (let idx = 0; idx < results.items.length; idx++) {
           // Only process selected items
@@ -459,24 +480,58 @@ export default function App() {
             // Replace the text with suggestion
             range.insertText(suggestion, "Replace");
             applied += 1;
+            appliedIndices.add(idx);
           } else {
             // Fallback: highlight + insert comment if no parseable suggestion
             range.font.highlightColor = "Yellow";
             const label = item.note?.label || "Note";
             range.insertText(` [${label}: ${message}]`, "After");
             applied += 1;
+            appliedIndices.add(idx);
           }
         }
 
         await context.sync();
-        setAppliedCount(applied);
-        setSkipped(localSkipped);
-        if (localSkipped.length > 0) {
-          setStatus(`Applied ${applied} replacements. Skipped ${localSkipped.length}.`);
-        } else {
-          setStatus(`Applied ${applied} replacements successfully.`);
-        }
       });
+
+      setAppliedCount(applied);
+      setSkipped(localSkipped);
+
+      if (applied === 0) {
+        setStatus("No selected issues could be applied. The selected text may already have changed. Re-run analysis to get fresh findings.");
+        return;
+      }
+
+      const remainingItems = results.items.filter((_: any, idx: number) => !appliedIndices.has(idx));
+
+      if (remainingItems.length > 0) {
+        setResults({
+          ...results,
+          items: remainingItems,
+          summary: {
+            ...results.summary,
+            total: remainingItems.length
+          }
+        });
+        setSelectedIssueIds(new Set([0]));
+      } else {
+        setResults(null);
+        setSelectedIssueIds(new Set());
+      }
+
+      if (localSkipped.length > 0) {
+        setStatus(
+          remainingItems.length > 0
+            ? `Applied ${applied} replacements. ${remainingItems.length} finding(s) remain. ${localSkipped.length} selected item(s) could not be applied.`
+            : `Applied ${applied} replacements. Re-run analysis to review the updated text. ${localSkipped.length} selected item(s) could not be applied.`
+        );
+      } else {
+        setStatus(
+          remainingItems.length > 0
+            ? `Applied ${applied} replacements. ${remainingItems.length} finding(s) remain.`
+            : "All selected fixes were applied. Run Analyze again to confirm no issues remain."
+        );
+      }
     } catch (err) {
       setStatus("Error applying plan.");
     }
@@ -731,10 +786,10 @@ export default function App() {
             <Text block size={200}>Bot: {botStatus}</Text>
             <Button 
               className={styles.primaryButton} 
-              disabled={loading || !directLine} 
+              disabled={loading || !directLine || !isBotConnected} 
               onClick={analyzeSelection}
             >
-              {loading ? <Spinner size="tiny" label="Analyzing..." /> : (!directLine ? "Waiting for Bot Connection..." : "Analyze Selected Text")}
+              {loading ? <Spinner size="tiny" label="Analyzing..." /> : (!directLine || !isBotConnected ? "Waiting for Bot Connection..." : "Analyze Selected Text")}
             </Button>
             <Button 
               className={styles.primaryButton}
@@ -761,29 +816,14 @@ export default function App() {
             <Card 
               key={i} 
               className={selectedIssueIds.has(i) ? styles.selectedIssueItem : styles.issueItem}
-              onClick={() => {
-                const newSelected = new Set(selectedIssueIds);
-                if (newSelected.has(i)) {
-                  newSelected.delete(i);
-                } else {
-                  newSelected.add(i);
-                }
-                setSelectedIssueIds(newSelected);
-              }}
+              onClick={() => toggleIssueSelection(i)}
               style={{ cursor: "pointer" }}
             >
               <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
                 <Checkbox 
                   checked={selectedIssueIds.has(i)}
-                  onChange={() => {
-                    const newSelected = new Set(selectedIssueIds);
-                    if (newSelected.has(i)) {
-                      newSelected.delete(i);
-                    } else {
-                      newSelected.add(i);
-                    }
-                    setSelectedIssueIds(newSelected);
-                  }}
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={() => toggleIssueSelection(i)}
                 />
                 <div style={{ flex: 1 }}>
                   <Text weight="bold" style={{color: "#0b1f37"}}>Issue #{i + 1}</Text>
