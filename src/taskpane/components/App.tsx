@@ -2,7 +2,7 @@
 import * as React from "react";
 import { 
   Button, Text, Field, Dropdown, Option, RadioGroup, Radio, Input,
-  makeStyles, tokens, Spinner, Card, Textarea, Divider
+  makeStyles, tokens, Spinner, Card, Textarea, Divider, Checkbox
 } from "@fluentui/react-components";
 import { DirectLine } from "botframework-directlinejs";
 
@@ -36,6 +36,13 @@ const useStyles = makeStyles({
     padding: "10px", 
     marginBottom: "10px", 
     backgroundColor: "white" 
+  },
+  selectedIssueItem: {
+    borderLeft: "4px solid #0b1f37",
+    padding: "10px",
+    marginBottom: "10px",
+    backgroundColor: "#E3F2FD",
+    borderTop: "2px solid #0b1f37"
   }
 });
 
@@ -119,6 +126,7 @@ export default function App() {
   const [appliedCount, setAppliedCount] = React.useState(0);
   const [directLine, setDirectLine] = React.useState<any>(null);
   const [botStatus, setBotStatus] = React.useState<string>("Connecting to bot...");
+  const [selectedIssueIds, setSelectedIssueIds] = React.useState<Set<number>>(new Set());
 
   // Initialize DirectLine with secure token from server
   React.useEffect(() => {
@@ -151,6 +159,15 @@ export default function App() {
     };
     startBot();
   }, []);
+
+  // Initialize issue selection when results change (issue #1 selected by default)
+  React.useEffect(() => {
+    if (results?.items?.length > 0) {
+      setSelectedIssueIds(new Set([0]));
+    } else {
+      setSelectedIssueIds(new Set());
+    }
+  }, [results]);
 
   // Initialization Form Data
   const [aud, setAud] = React.useState<AudienceSetup>({
@@ -313,7 +330,11 @@ export default function App() {
         }
 
         setResults(data);
-        setStatus(`Plan ready. ${data.items.length} findings to apply.`);
+        if (data.items.length === 0) {
+          setStatus("Analysis complete. No issues found – your text is plain language ready!");
+        } else {
+          setStatus(`Analysis complete. ${data.items.length} findings ready. Select issues to apply.`);
+        }
       });
     } catch (err: any) {
       const message = err?.message ? String(err.message) : "Unknown error";
@@ -325,6 +346,11 @@ export default function App() {
   const applyPlan = async () => {
     if (!results?.items?.length) {
       setStatus("No plan to apply.");
+      return;
+    }
+
+    if (selectedIssueIds.size === 0) {
+      setStatus("Please select at least one issue to apply.");
       return;
     }
 
@@ -342,7 +368,13 @@ export default function App() {
         const localSkipped: { text: string; reason: string }[] = [];
         let applied = 0;
 
-        for (const item of results.items) {
+        for (let idx = 0; idx < results.items.length; idx++) {
+          // Only process selected items
+          if (!selectedIssueIds.has(idx)) {
+            continue;
+          }
+
+          const item = results.items[idx];
           const isSingleWord = item.match.text.trim().split(/\s+/).length === 1;
           const ranges = selection.search(item.match.text, { matchCase: false, matchWholeWord: isSingleWord });
           ranges.load("items");
@@ -654,12 +686,48 @@ export default function App() {
             {results && <Text block weight="bold">Readability Score: {results.plainnessScore}%</Text>}
           </div>
 
+          {results?.items && results.items.length === 0 && (
+            <Card className={styles.issueItem}>
+              <Text weight="bold" style={{color: "#0b1f37"}}>No Issues Found</Text>
+              <Text block size={200}>Your text meets plain language standards for your audience. Great job!</Text>
+            </Card>
+          )}
+
           {results?.items.map((issue: any, i: number) => (
-            <Card key={i} className={styles.issueItem}>
-              <Text weight="bold" style={{color: "#0b1f37"}}>Issue #{i + 1}</Text>
-              <Text block italic>"{issue.match.text}"</Text>
-              <Text block size={200}>{issue.note.message}</Text>
-              <Text block size={100}>Category: {issue.note.label || "Unlabeled"}</Text>
+            <Card 
+              key={i} 
+              className={selectedIssueIds.has(i) ? styles.selectedIssueItem : styles.issueItem}
+              onClick={() => {
+                const newSelected = new Set(selectedIssueIds);
+                if (newSelected.has(i)) {
+                  newSelected.delete(i);
+                } else {
+                  newSelected.add(i);
+                }
+                setSelectedIssueIds(newSelected);
+              }}
+              style={{ cursor: "pointer" }}
+            >
+              <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                <Checkbox 
+                  checked={selectedIssueIds.has(i)}
+                  onChange={() => {
+                    const newSelected = new Set(selectedIssueIds);
+                    if (newSelected.has(i)) {
+                      newSelected.delete(i);
+                    } else {
+                      newSelected.add(i);
+                    }
+                    setSelectedIssueIds(newSelected);
+                  }}
+                />
+                <div style={{ flex: 1 }}>
+                  <Text weight="bold" style={{color: "#0b1f37"}}>Issue #{i + 1}</Text>
+                  <Text block italic>"{issue.match.text}"</Text>
+                  <Text block size={200}>{issue.note.message}</Text>
+                  <Text block size={100}>Category: {issue.note.label || "Unlabeled"}</Text>
+                </div>
+              </div>
             </Card>
           ))}
 
