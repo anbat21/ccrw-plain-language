@@ -200,20 +200,19 @@ export default function App() {
             return;
           }
 
-          if (reconnectAttemptsRef.current >= 3) {
-            setBotStatus("Error: Reconnect failed");
-            setStatus("Bot disconnected after multiple retries. Please reload the add-in.");
-            return;
-          }
-
           reconnectingRef.current = true;
           reconnectAttemptsRef.current += 1;
           setBotStatus("Bot reconnecting...");
           setStatus("Connection interrupted. Refreshing token and reconnecting...");
 
-          void connectBot(true).finally(() => {
-            reconnectingRef.current = false;
-          });
+          // Calculate exponential backoff: 1s, 2s, 4s, 8s, etc (max 30s)
+          const delayMs = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
+
+          setTimeout(() => {
+            void connectBot(true).finally(() => {
+              reconnectingRef.current = false;
+            });
+          }, delayMs);
         }
       });
 
