@@ -131,6 +131,7 @@ export default function App() {
   const [analysisScopeId, setAnalysisScopeId] = React.useState<number | null>(null);
   const directLineRef = React.useRef<any>(null);
   const connectionSubRef = React.useRef<any>(null);
+  const activitySubRef = React.useRef<any>(null);
   const reconnectingRef = React.useRef(false);
   const reconnectAttemptsRef = React.useRef(0);
 
@@ -170,6 +171,9 @@ export default function App() {
       if (connectionSubRef.current) {
         connectionSubRef.current.unsubscribe();
       }
+      if (activitySubRef.current) {
+        activitySubRef.current.unsubscribe();
+      }
       if (directLineRef.current && directLineRef.current !== dl) {
         try {
           directLineRef.current.end();
@@ -183,6 +187,16 @@ export default function App() {
       setIsBotConnected(false);
       setBotStatus(isReconnect ? "Bot reconnecting..." : "Connecting to bot...");
       setStatus(isReconnect ? "Refreshing token and reconnecting..." : "System Ready.");
+
+      // DirectLine only begins connecting once activity$ or postActivity is subscribed.
+      activitySubRef.current = dl.activity$.subscribe({
+        next: () => {
+          // No-op. This subscription exists to start and keep the DirectLine session alive.
+        },
+        error: () => {
+          setIsBotConnected(false);
+        }
+      });
 
       connectionSubRef.current = dl.connectionStatus$.subscribe((connectionStatus: number) => {
         // 2=Online, 3=ExpiredToken, 4=FailedToConnect, 5=Ended
@@ -233,6 +247,9 @@ export default function App() {
     return () => {
       if (connectionSubRef.current) {
         connectionSubRef.current.unsubscribe();
+      }
+      if (activitySubRef.current) {
+        activitySubRef.current.unsubscribe();
       }
       if (directLineRef.current) {
         try {

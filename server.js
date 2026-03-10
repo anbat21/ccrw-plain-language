@@ -1,12 +1,13 @@
+const path = require('path');
+
 // Load .env only in local development (Azure uses portal environment variables)
 try {
-    require('dotenv').config();
+    require('dotenv').config({ path: path.join(__dirname, '.env') });
 } catch (e) {
     console.log('dotenv not available, using system environment variables');
 }
 
 const express = require('express');
-const path = require('path');
 const fetch = require('node-fetch');
 
 const app = express();
