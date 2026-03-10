@@ -128,6 +128,7 @@ export default function App() {
   const [botStatus, setBotStatus] = React.useState<string>("Connecting to bot...");
   const [isBotConnected, setIsBotConnected] = React.useState(false);
   const [selectedIssueIds, setSelectedIssueIds] = React.useState<Set<number>>(new Set());
+  const [analysisScopeId, setAnalysisScopeId] = React.useState<number | null>(null);
   const directLineRef = React.useRef<any>(null);
   const connectionSubRef = React.useRef<any>(null);
   const reconnectingRef = React.useRef(false);
@@ -164,7 +165,7 @@ export default function App() {
         return false;
       }
 
-      const dl = new DirectLine({ token: token });
+      const dl = new DirectLine({ token: token, webSocket: false });
 
       if (connectionSubRef.current) {
         connectionSubRef.current.unsubscribe();
@@ -341,6 +342,16 @@ export default function App() {
     
     try {
       await Word.run(async (context) => {
+        if (analysisScopeId !== null) {
+          const existingScope = context.document.contentControls.getByIdOrNullObject(analysisScopeId);
+          existingScope.load("isNullObject");
+          await context.sync();
+          if (!existingScope.isNullObject) {
+            existingScope.delete(false);
+            await context.sync();
+          }
+        }
+
         const selection = context.document.getSelection();
         selection.load("text");
         await context.sync();
@@ -350,6 +361,13 @@ export default function App() {
           setLoading(false);
           return;
         }
+
+        const analysisScope = selection.insertContentControl();
+        analysisScope.tag = "ccrw-analysis-scope";
+        (analysisScope as any).appearance = "Hidden";
+        analysisScope.load("id");
+        await context.sync();
+        setAnalysisScopeId(analysisScope.id);
 
         // Build audience context for the AI engine
         const audienceContext = buildAudienceContext(aud);
@@ -447,6 +465,9 @@ export default function App() {
 
         setResults(normalizedData);
         if (uniqueItems.length === 0) {
+          analysisScope.delete(false);
+          await context.sync();
+          setAnalysisScopeId(null);
           setStatus("Analysis complete. No issues found – your text is plain language ready!");
         } else {
           setStatus(`Analysis complete. ${uniqueItems.length} findings ready. Select issues to apply.`);
@@ -481,9 +502,17 @@ export default function App() {
       const appliedIndices = new Set<number>();
 
       await Word.run(async (context) => {
-        const selection = context.document.getSelection();
-        selection.load("text");
-        await context.sync();
+        let searchScope: Word.Range = context.document.getSelection();
+
+        if (analysisScopeId !== null) {
+          const analysisScope = context.document.contentControls.getByIdOrNullObject(analysisScopeId);
+          analysisScope.load("isNullObject");
+          await context.sync();
+
+          if (!analysisScope.isNullObject) {
+            searchScope = analysisScope.getRange();
+          }
+        }
 
         for (let idx = 0; idx < results.items.length; idx++) {
           // Only process selected items
@@ -493,11 +522,11 @@ export default function App() {
 
           const item = results.items[idx];
           const isSingleWord = item.match.text.trim().split(/\s+/).length === 1;
-          const ranges = selection.search(item.match.text, { matchCase: false, matchWholeWord: isSingleWord });
+          const ranges = searchScope.search(item.match.text, { matchCase: false, matchWholeWord: isSingleWord });
           ranges.load("items");
           await context.sync();
           if (ranges.items.length === 0) {
-            localSkipped.push({ text: item.match.text, reason: "Not found in selection" });
+            localSkipped.push({ text: item.match.text, reason: "Not found in analyzed text" });
             continue;
           }
 
@@ -538,8 +567,20 @@ export default function App() {
         });
         setSelectedIssueIds(new Set([0]));
       } else {
+        if (analysisScopeId !== null) {
+          await Word.run(async (context) => {
+            const analysisScope = context.document.contentControls.getByIdOrNullObject(analysisScopeId);
+            analysisScope.load("isNullObject");
+            await context.sync();
+            if (!analysisScope.isNullObject) {
+              analysisScope.delete(false);
+              await context.sync();
+            }
+          });
+        }
         setResults(null);
         setSelectedIssueIds(new Set());
+        setAnalysisScopeId(null);
       }
 
       if (localSkipped.length > 0) {
