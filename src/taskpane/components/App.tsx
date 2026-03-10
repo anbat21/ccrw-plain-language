@@ -127,38 +127,102 @@ export default function App() {
   const [directLine, setDirectLine] = React.useState<any>(null);
   const [botStatus, setBotStatus] = React.useState<string>("Connecting to bot...");
   const [selectedIssueIds, setSelectedIssueIds] = React.useState<Set<number>>(new Set());
+  const directLineRef = React.useRef<any>(null);
+  const connectionSubRef = React.useRef<any>(null);
+  const reconnectingRef = React.useRef(false);
+  const reconnectAttemptsRef = React.useRef(0);
 
-  // Initialize DirectLine with secure token from server
+  const connectBot = React.useCallback(async (isReconnect = false) => {
+    try {
+      // Call the internal API created in server.js to get a fresh short-lived token
+      const res = await fetch('/api/get-token');
+      if (!res.ok) {
+        setBotStatus(`Error: Token API failed (${res.status})`);
+        setStatus("Bot connection failed. Check server and /api/get-token.");
+        return false;
+      }
+
+      const { token } = await res.json();
+      if (!token) {
+        setBotStatus("Error: No token received");
+        setStatus("Bot connection failed. Token response was empty.");
+        return false;
+      }
+
+      const dl = new DirectLine({ token: token });
+
+      if (connectionSubRef.current) {
+        connectionSubRef.current.unsubscribe();
+      }
+      if (directLineRef.current && directLineRef.current !== dl) {
+        try {
+          directLineRef.current.end();
+        } catch {
+          // Ignore close errors from previous stale connection
+        }
+      }
+
+      directLineRef.current = dl;
+      setDirectLine(dl);
+      reconnectAttemptsRef.current = 0;
+      setBotStatus("Bot connected");
+      setStatus(isReconnect ? "Bot reconnected with a fresh token." : "System Ready.");
+
+      connectionSubRef.current = dl.connectionStatus$.subscribe((connectionStatus: number) => {
+        // 2=Online, 3=ExpiredToken, 4=FailedToConnect, 5=Ended
+        if (connectionStatus === 2) {
+          setBotStatus("Bot connected");
+          return;
+        }
+
+        if (connectionStatus === 3 || connectionStatus === 4 || connectionStatus === 5) {
+          if (reconnectingRef.current) {
+            return;
+          }
+
+          if (reconnectAttemptsRef.current >= 3) {
+            setBotStatus("Error: Reconnect failed");
+            setStatus("Bot disconnected after multiple retries. Please reload the add-in.");
+            return;
+          }
+
+          reconnectingRef.current = true;
+          reconnectAttemptsRef.current += 1;
+          setBotStatus("Bot reconnecting...");
+          setStatus("Connection interrupted. Refreshing token and reconnecting...");
+
+          void connectBot(true).finally(() => {
+            reconnectingRef.current = false;
+          });
+        }
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Error initializing bot:", error);
+      setBotStatus("Error: Bot connection failed");
+      setStatus("Bot connection failed. Check server and secret configuration.");
+      return false;
+    }
+  }, []);
+
+  // Initialize DirectLine with secure token from server and auto-reconnect behavior
   React.useEffect(() => {
-    const startBot = async () => {
-      try {
-        // Call the internal API created in server.js
-        const res = await fetch('/api/get-token');
-        if (!res.ok) {
-          setBotStatus(`Error: Token API failed (${res.status})`);
-          setStatus("Bot connection failed. Check server and /api/get-token.");
-          return;
+    void connectBot(false);
+
+    return () => {
+      if (connectionSubRef.current) {
+        connectionSubRef.current.unsubscribe();
+      }
+      if (directLineRef.current) {
+        try {
+          directLineRef.current.end();
+        } catch {
+          // Ignore close errors during unmount
         }
-        const { token } = await res.json();
-        if (!token) {
-          setBotStatus("Error: No token received");
-          setStatus("Bot connection failed. Token response was empty.");
-          return;
-        }
-        
-        // Initialize DirectLine using the temporary Token instead of the permanent Secret
-        const dl = new DirectLine({ token: token });
-        setDirectLine(dl);
-        setBotStatus("Bot connected");
-        setStatus("System Ready.");
-      } catch (error) {
-        console.error('Error initializing bot:', error);
-        setBotStatus("Error: Bot connection failed");
-        setStatus("Bot connection failed. Check server and secret configuration.");
       }
     };
-    startBot();
-  }, []);
+  }, [connectBot]);
 
   // Initialize issue selection when results change (issue #1 selected by default)
   React.useEffect(() => {
