@@ -296,6 +296,7 @@ export default function App() {
       return item.type === "highlight" &&
         item.match?.strategy === "exactText" &&
         typeof item.match?.text === "string" && item.match.text.trim().length > 0 &&
+        typeof item.replacementText === "string" && item.replacementText.trim().length > 0 &&
         item.style?.color &&
         typeof item.note?.label === "string" &&
         item.note?.message;
@@ -306,6 +307,25 @@ export default function App() {
     return { valid: true, reason: "" };
   };
 
+  const dedupePlanItems = (items: any[]) => {
+    const seen = new Set<string>();
+
+    return items.filter((item: any) => {
+      const key = [
+        item.match?.text?.trim().toLowerCase(),
+        item.replacementText?.trim().toLowerCase(),
+        item.note?.label?.trim().toLowerCase(),
+        item.note?.message?.trim().toLowerCase()
+      ].join("::");
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+  };
   const analyzeSelection = async () => {
     if (!directLine || !isBotConnected) {
       setStatus("Bot not connected yet. Please wait...");
@@ -374,7 +394,9 @@ export default function App() {
             `   - If the sentence gives vague portal or form instructions, name the field, button label, and expected input format.\n\n` +
             `Rules:\n` +
             `- EVERY issue must include the exact phrase from input text in match.text.\n` +
-            `- EVERY note.message must contain a specific replacement suggestion, not just advice.\n` +
+            `- EVERY issue must include replacementText with the exact text that should replace match.text.\n` +
+            `- replacementText must be plain replacement text only. Do not include labels, quotes around the whole answer, or explanations.\n` +
+            `- EVERY note.message must explain why the replacement helps, not act as the source of truth for the replacement.\n` +
             `- Include a category label in note.label.\n` +
             `- Output must be STRICT JSON only.\n\n` +
             `Category labels to use in note.label:\n` +
@@ -388,7 +410,7 @@ export default function App() {
             `- "format"\n` +
             `- "digital-instructions"\n\n` +
             `Return ONLY this JSON schema:\n` +
-            `{"version":"1.0","scope":"selection","plainnessScore":0,"items":[{"id":"A1","type":"highlight","match":{"strategy":"exactText","text":"EXACT_PHRASE"},"style":{"color":"yellow"},"note":{"label":"sentence-length","message":"Replace with 'First sentence... Second sentence...' for clarity"}}],"summary":{"total":1,"categories":{"passive-voice":0,"sentence-length":0,"jargon":0,"context-clarity":0,"cognitive-load":0,"distress-tone":0,"navigation":0,"format":0,"digital-instructions":0}}}\n\n` +
+            `{"version":"1.0","scope":"selection","plainnessScore":0,"items":[{"id":"A1","type":"highlight","match":{"strategy":"exactText","text":"EXACT_PHRASE"},"replacementText":"REPLACEMENT_TEXT","style":{"color":"yellow"},"note":{"label":"sentence-length","message":"Split this into two shorter sentences so the action is easier to follow."}}],"summary":{"total":1,"categories":{"passive-voice":0,"sentence-length":0,"jargon":0,"context-clarity":0,"cognitive-load":0,"distress-tone":0,"navigation":0,"format":0,"digital-instructions":0}}}\n\n` +
             `[CONTEXT]\n${audienceContext}\n\n` +
             `Analyze this selection and output JSON only:\n${selection.text}`;
           directLine.postActivity({ from: { id: "user" }, type: "message", text: prompt }).subscribe({
@@ -413,11 +435,21 @@ export default function App() {
           return;
         }
 
-        setResults(data);
-        if (data.items.length === 0) {
+        const uniqueItems = dedupePlanItems(data.items);
+        const normalizedData = {
+          ...data,
+          items: uniqueItems,
+          summary: {
+            ...data.summary,
+            total: uniqueItems.length
+          }
+        };
+
+        setResults(normalizedData);
+        if (uniqueItems.length === 0) {
           setStatus("Analysis complete. No issues found – your text is plain language ready!");
         } else {
-          setStatus(`Analysis complete. ${data.items.length} findings ready. Select issues to apply.`);
+          setStatus(`Analysis complete. ${uniqueItems.length} findings ready. Select issues to apply.`);
         }
       });
     } catch (err: any) {
@@ -470,24 +502,15 @@ export default function App() {
           }
 
           const range = ranges.items[0];
-          const message = item.note?.message || "";
-          
-          // Parse suggestion from message (e.g., "Replace with 'xyz' for clarity")
-          const suggestionMatch = message.match(/Replace with ['"](.+?)['"]|Replace with: ['"](.+?)['"]/i);
-          const suggestion = suggestionMatch ? (suggestionMatch[1] || suggestionMatch[2]) : null;
+          const replacementText = typeof item.replacementText === "string" ? item.replacementText.trim() : "";
 
-          if (suggestion) {
-            // Replace the text with suggestion
-            range.insertText(suggestion, "Replace");
+          if (replacementText) {
+            // Replace the text with the explicit replacement returned by the agent
+            range.insertText(replacementText, "Replace");
             applied += 1;
             appliedIndices.add(idx);
           } else {
-            // Fallback: highlight + insert comment if no parseable suggestion
-            range.font.highlightColor = "Yellow";
-            const label = item.note?.label || "Note";
-            range.insertText(` [${label}: ${message}]`, "After");
-            applied += 1;
-            appliedIndices.add(idx);
+            localSkipped.push({ text: item.match.text, reason: "Missing replacement text from analysis result" });
           }
         }
 
