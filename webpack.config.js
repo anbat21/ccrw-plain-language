@@ -6,7 +6,7 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const webpack = require("webpack");
 
 const urlDev = "https://localhost:3000/";
-const urlProd = "https://ccrw-plain-language-e4eaeyc9c6gdesah.canadacentral-01.azurewebsites.net/"; 
+const urlProd = "https://plainlanguageaddin-ehdwa7gwg0g6g0gh.canadacentral-01.azurewebsites.net/";
 
 async function getHttpsOptions() {
   const httpsOptions = await devCerts.getHttpsServerOptions();
