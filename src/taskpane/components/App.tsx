@@ -906,7 +906,7 @@ export default function App() {
                   onChange={() => toggleIssueSelection(i)}
                 />
                 <div style={{ flex: 1 }}>
-                  <Text weight="bold" style={{color: "#0b1f37"}}>Issue #{i + 1}</Text>
+                  <Text weight="bold" style={{color: "#0b1f37"}}>Tip #{i + 1}</Text>
                   <Text block italic>"{issue.match.text}"</Text>
                   <Text block size={200}>{issue.note.message}</Text>
                   <Text block size={100}>Category: {issue.note.label || "Unlabeled"}</Text>
