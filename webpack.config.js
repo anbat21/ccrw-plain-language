@@ -93,6 +93,9 @@ module.exports = async (env, options) => {
       new webpack.ProvidePlugin({
         Promise: ["es6-promise", "Promise"],
       }),
+      new webpack.DefinePlugin({
+        "process.env.REACT_APP_INSTRUMENTATION_KEY": JSON.stringify(process.env.REACT_APP_INSTRUMENTATION_KEY || ""),
+      }),
     ],
     devServer: {
       hot: true,
