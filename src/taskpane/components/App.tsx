@@ -512,13 +512,13 @@ export default function App() {
           analysisScope.delete(false);
           await context.sync();
           setAnalysisScopeId(null);
-          setStatus("Analysis complete. No issues found – your text is plain language ready!");
+          setStatus("Analysis complete. No tips found – your text is plain language ready!");
           telemetry.trackEvent('AnalysisCompleted', {
             findingsCount: 0,
             plainessScore: normalizedData.plainnessScore,
           });
         } else {
-          setStatus(`Analysis complete. ${uniqueItems.length} findings ready. Select issues to apply.`);
+          setStatus(`Analysis complete. ${uniqueItems.length} findings ready. Select tips to apply.`);
           telemetry.trackEvent('AnalysisCompleted', {
             findingsCount: uniqueItems.length,
             plainessScore: normalizedData.plainnessScore,
@@ -540,7 +540,7 @@ export default function App() {
     }
 
     if (selectedIssueIds.size === 0) {
-      setStatus("Please select at least one issue to apply.");
+      setStatus("Please select at least one tip to apply.");
       return;
     }
 
@@ -608,7 +608,7 @@ export default function App() {
       setSkipped(localSkipped);
 
       if (applied === 0) {
-        setStatus("No selected issues could be applied. The selected text may already have changed. Re-run analysis to get fresh findings.");
+        setStatus("No selected tips could be applied. The selected text may already have changed. Re-run analysis to get fresh findings.");
         telemetry.trackEvent('TipsApplyCompleted', {
           appliedCount: 0,
           skippedCount: String(localSkipped.length),
@@ -655,7 +655,7 @@ export default function App() {
         setStatus(
           remainingItems.length > 0
             ? `Applied ${applied} replacements. ${remainingItems.length} finding(s) remain.`
-            : "All selected fixes were applied. Run Analyze again to confirm no issues remain."
+            : "All selected tips were applied. Run Analyze again to confirm no tips remain."
         );
       }
 
@@ -947,7 +947,7 @@ export default function App() {
 
           {results?.items && results.items.length === 0 && (
             <Card className={styles.issueItem}>
-              <Text weight="bold" style={{color: "#0b1f37"}}>No Issues Found</Text>
+              <Text weight="bold" style={{color: "#0b1f37"}}>No Tips Found</Text>
               <Text block size={200}>Your text meets plain language standards for your audience. Great job!</Text>
             </Card>
           )}
