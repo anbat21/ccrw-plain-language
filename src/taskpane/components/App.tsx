@@ -5,6 +5,7 @@ import {
   makeStyles, tokens, Spinner, Card, Textarea, Divider, Checkbox
 } from "@fluentui/react-components";
 import { DirectLine } from "botframework-directlinejs";
+import { telemetry } from "../../services/telemetry";
 
 // Professional Styling: Dark Navy and White Theme
 const useStyles = makeStyles({
@@ -240,6 +241,21 @@ export default function App() {
     }
   }, []);
 
+  // Initialize Application Insights telemetry
+  React.useEffect(() => {
+    const instrumentationKey = process.env.REACT_APP_INSTRUMENTATION_KEY;
+    if (instrumentationKey) {
+      telemetry.initialize({
+        instrumentationKey,
+        enableAutoRouteTracking: true,
+        enableUnhandledPromiseRejectionTracking: true,
+        autoTrackPageVisitTime: true,
+      });
+    } else {
+      console.warn('[App] Application Insights Instrumentation Key not found in environment variables');
+    }
+  }, []);
+
   // Initialize DirectLine with secure token from server and auto-reconnect behavior
   React.useEffect(() => {
     void connectBot(false);
@@ -349,6 +365,11 @@ export default function App() {
       return;
     }
 
+    telemetry.trackEvent('AnalysisStarted', {
+      audience: aud.primaryAudience,
+      audienceType: aud.audienceType,
+    });
+
     setLoading(true);
     setStatus("Processing...");
     setResults(null);
@@ -374,6 +395,9 @@ export default function App() {
 
         if (!selection.text || selection.text.trim().length === 0) {
           setStatus("Please select text in Word before analyzing.");
+          telemetry.trackEvent('AnalysisError', {
+            reason: 'NoTextSelected',
+          });
           setLoading(false);
           return;
         }
@@ -465,6 +489,10 @@ export default function App() {
         const validation = validatePlan(data);
         if (!validation.valid) {
           setStatus(`Invalid plan: ${validation.reason}`);
+          telemetry.trackEvent('AnalysisError', {
+            reason: 'InvalidPlan',
+            detail: validation.reason,
+          });
           setResults(null);
           return;
         }
@@ -485,13 +513,22 @@ export default function App() {
           await context.sync();
           setAnalysisScopeId(null);
           setStatus("Analysis complete. No issues found – your text is plain language ready!");
+          telemetry.trackEvent('AnalysisCompleted', {
+            findingsCount: 0,
+            plainessScore: normalizedData.plainnessScore,
+          });
         } else {
           setStatus(`Analysis complete. ${uniqueItems.length} findings ready. Select issues to apply.`);
+          telemetry.trackEvent('AnalysisCompleted', {
+            findingsCount: uniqueItems.length,
+            plainessScore: normalizedData.plainnessScore,
+          });
         }
       });
     } catch (err: any) {
       const message = err?.message ? String(err.message) : "Unknown error";
       setStatus(`Error: ${message}`);
+      telemetry.trackException(err, 'AnalysisError');
     }
     setLoading(false);
   };
@@ -506,6 +543,11 @@ export default function App() {
       setStatus("Please select at least one issue to apply.");
       return;
     }
+
+    telemetry.trackEvent('TipsApplyStarted', {
+      selectedCount: String(selectedIssueIds.size),
+      totalCount: String(results.items.length),
+    });
 
     setLoading(true);
     setStatus("Applying replacements...");
@@ -567,6 +609,10 @@ export default function App() {
 
       if (applied === 0) {
         setStatus("No selected issues could be applied. The selected text may already have changed. Re-run analysis to get fresh findings.");
+        telemetry.trackEvent('TipsApplyCompleted', {
+          appliedCount: 0,
+          skippedCount: String(localSkipped.length),
+        });
         return;
       }
 
@@ -612,8 +658,15 @@ export default function App() {
             : "All selected fixes were applied. Run Analyze again to confirm no issues remain."
         );
       }
+
+      telemetry.trackEvent('TipsApplyCompleted', {
+        appliedCount: String(applied),
+        skippedCount: String(localSkipped.length),
+        remainingCount: String(remainingItems.length),
+      });
     } catch (err) {
       setStatus("Error applying plan.");
+      telemetry.trackException(err as Error, 'TipsApplyError');
     }
 
     setLoading(false);
@@ -846,7 +899,14 @@ export default function App() {
           <Button
             className={styles.primaryButton}
             disabled={!isFormValid}
-            onClick={() => setIsReady(true)}
+            onClick={() => {
+              telemetry.trackEvent('AudienceSetupCompleted', {
+                primaryAudience: aud.primaryAudience,
+                audienceType: aud.audienceType,
+                communicationType: aud.whatCreating,
+              });
+              setIsReady(true);
+            }}
           >
             Start Analysis
           </Button>

@@ -7,6 +7,29 @@ try {
     console.log('dotenv not available, using system environment variables');
 }
 
+// Initialize Azure Monitor OpenTelemetry
+const { useAzureMonitor, AzureMonitorTraceExporter } = require('@azure/monitor-opentelemetry');
+const { Resource } = require('@opentelemetry/resources');
+const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
+
+const instrumentationKey = process.env.REACT_APP_INSTRUMENTATION_KEY;
+if (instrumentationKey) {
+    try {
+        useAzureMonitor({
+            instrumentationKey: instrumentationKey,
+            resourceAttributes: {
+                [SemanticResourceAttributes.SERVICE_NAME]: 'ccrw-plain-language-server',
+                [SemanticResourceAttributes.SERVICE_VERSION]: '1.0.0',
+            },
+        });
+        console.log('[Telemetry] Azure Monitor OpenTelemetry initialized');
+    } catch (err) {
+        console.warn('[Telemetry] Failed to initialize OpenTelemetry:', err.message);
+    }
+} else {
+    console.warn('[Telemetry] REACT_APP_INSTRUMENTATION_KEY not found, telemetry disabled');
+}
+
 const express = require('express');
 const fetch = require('node-fetch');
 
