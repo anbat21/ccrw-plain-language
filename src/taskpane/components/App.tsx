@@ -453,6 +453,8 @@ export default function App() {
             `Rules:\n` +
             `- EVERY issue must include the exact phrase from input text in match.text.\n` +
             `- EVERY issue must include replacementText with the exact text that should replace match.text.\n` +
+            `- replacementText is REQUIRED and must never be empty.\n` +
+            `- For passive voice findings, replacementText must be the full active-voice rewrite, not an explanation.\n` +
             `- replacementText must be plain replacement text only. Do not include labels, quotes around the whole answer, or explanations.\n` +
             `- EVERY note.message must explain why the replacement helps, not act as the source of truth for the replacement.\n` +
             `- Include a category label in note.label.\n` +
@@ -968,6 +970,15 @@ export default function App() {
                 <div style={{ flex: 1 }}>
                   <Text weight="bold" style={{color: "#0b1f37"}}>Tip #{i + 1}</Text>
                   <Text block italic>"{issue.match.text}"</Text>
+                  {typeof issue.replacementText === "string" && issue.replacementText.trim().length > 0 ? (
+                    <Text block>
+                      Suggested replacement: <b>"{issue.replacementText}"</b>
+                    </Text>
+                  ) : (
+                    <Text block size={200} style={{ color: "#b3261e" }}>
+                      Suggested replacement missing. Re-run analysis for a complete apply-ready result.
+                    </Text>
+                  )}
                   <Text block size={200}>{issue.note.message}</Text>
                   <Text block size={100}>Category: {issue.note.label || "Unlabeled"}</Text>
                 </div>
