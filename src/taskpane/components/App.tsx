@@ -944,7 +944,6 @@ export default function App() {
 
           <div style={{padding: "10px", backgroundColor: "#F3E5F5", borderRadius: "4px"}}>
             <Text weight="bold">Status: </Text><Text>{status}</Text>
-            {results && <Text block weight="bold">Readability Score: {results.plainnessScore}%</Text>}
           </div>
 
           {results?.items && results.items.length === 0 && (
@@ -972,7 +971,7 @@ export default function App() {
                   <Text block italic>"{issue.match.text}"</Text>
                   {typeof issue.replacementText === "string" && issue.replacementText.trim().length > 0 ? (
                     <Text block>
-                      Suggested replacement: <b>"{issue.replacementText}"</b>
+                      Suggested replacement: "{issue.replacementText}"
                     </Text>
                   ) : (
                     <Text block size={200} style={{ color: "#b3261e" }}>
