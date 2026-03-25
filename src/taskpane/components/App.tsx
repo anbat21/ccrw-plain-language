@@ -514,7 +514,7 @@ export default function App() {
           analysisScope.delete(false);
           await context.sync();
           setAnalysisScopeId(null);
-          setStatus("Analysis complete. No tips found – your text is plain language ready!");
+          setStatus("No more tips. Please select text to analyze.");
           telemetry.trackEvent('AnalysisCompleted', {
             findingsCount: 0,
             plainessScore: normalizedData.plainnessScore,
@@ -581,12 +581,25 @@ export default function App() {
           }
 
           const item = results.items[idx];
-          const isSingleWord = item.match.text.trim().split(/\s+/).length === 1;
-          const ranges = searchScope.search(item.match.text, { matchCase: false, matchWholeWord: isSingleWord });
-          ranges.load("items");
-          await context.sync();
+          const matchText = typeof item?.match?.text === "string" ? item.match.text.trim() : "";
+          if (!matchText) {
+            localSkipped.push({ text: "(empty match)", reason: "Missing source text in analysis result" });
+            continue;
+          }
+
+          const isSingleWord = matchText.split(/\s+/).length === 1;
+          let ranges: Word.RangeCollection;
+          try {
+            ranges = searchScope.search(matchText, { matchCase: false, matchWholeWord: isSingleWord });
+            ranges.load("items");
+            await context.sync();
+          } catch {
+            localSkipped.push({ text: matchText, reason: "Search failed in current document scope" });
+            continue;
+          }
+
           if (ranges.items.length === 0) {
-            localSkipped.push({ text: item.match.text, reason: "Not found in analyzed text" });
+            localSkipped.push({ text: matchText, reason: "Not found in analyzed text" });
             continue;
           }
 
@@ -594,12 +607,16 @@ export default function App() {
           const replacementText = typeof item.replacementText === "string" ? item.replacementText.trim() : "";
 
           if (replacementText) {
-            // Replace the text with the explicit replacement returned by the agent
-            range.insertText(replacementText, "Replace");
-            applied += 1;
-            appliedIndices.add(idx);
+            try {
+              // Replace the text with the explicit replacement returned by the agent
+              range.insertText(replacementText, "Replace");
+              applied += 1;
+              appliedIndices.add(idx);
+            } catch {
+              localSkipped.push({ text: matchText, reason: "Replacement failed" });
+            }
           } else {
-            localSkipped.push({ text: item.match.text, reason: "Missing replacement text from analysis result" });
+            localSkipped.push({ text: matchText, reason: "Missing replacement text from analysis result" });
           }
         }
 
@@ -657,7 +674,7 @@ export default function App() {
         setStatus(
           remainingItems.length > 0
             ? `Applied ${applied} replacements. ${remainingItems.length} finding(s) remain.`
-            : "All selected tips were applied. Run Analyze again to confirm no tips remain."
+            : "No more tips. Please select text to analyze."
         );
       }
 
@@ -667,11 +684,12 @@ export default function App() {
         remainingCount: String(remainingItems.length),
       });
     } catch (err) {
-      setStatus("Error applying plan.");
+      const message = (err as any)?.message ? String((err as any).message) : "Unknown error";
+      setStatus(`Error applying plan: ${message}`);
       telemetry.trackException(err as Error, 'TipsApplyError');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
