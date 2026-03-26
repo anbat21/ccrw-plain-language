@@ -359,6 +359,48 @@ export default function App() {
       return true;
     });
   };
+
+  const setFirstAlphaCase = (text: string, upper: boolean) => {
+    return text.replace(/[A-Za-z]/, (char) => (upper ? char.toUpperCase() : char.toLowerCase()));
+  };
+
+  const normalizeReplacementText = (matchText: string, replacementText: string) => {
+    const source = matchText.trim();
+    let cleaned = replacementText.trim();
+
+    // Normalize spacing and repeated punctuation from model output.
+    cleaned = cleaned.replace(/\s+/g, " ");
+    cleaned = cleaned.replace(/\s+([,.;:!?])/g, "$1");
+    cleaned = cleaned.replace(/([,.;:!?])\1+/g, "$1");
+    cleaned = cleaned.replace(/,\s*,+/g, ", ");
+    cleaned = cleaned.replace(/\.\.+/g, ".");
+
+    // Keep terminal punctuation style aligned with the source fragment.
+    const sourceEndsWithTerminal = /[.!?]$/.test(source);
+    const cleanedEndsWithTerminal = /[.!?]$/.test(cleaned);
+    if (!sourceEndsWithTerminal && cleanedEndsWithTerminal) {
+      cleaned = cleaned.replace(/[.!?]+$/, "");
+    }
+    if (sourceEndsWithTerminal && !cleanedEndsWithTerminal) {
+      const sourceEnding = source.match(/[.!?]+$/);
+      if (sourceEnding) {
+        cleaned = `${cleaned}${sourceEnding[0][0]}`;
+      }
+    }
+
+    // Preserve first-letter case pattern of the source fragment.
+    const sourceStartsUpper = /^[A-Z]/.test(source);
+    const cleanedStartsUpper = /^[A-Z]/.test(cleaned);
+    if (sourceStartsUpper && !cleanedStartsUpper) {
+      cleaned = setFirstAlphaCase(cleaned, true);
+    }
+    if (!sourceStartsUpper && cleanedStartsUpper) {
+      cleaned = setFirstAlphaCase(cleaned, false);
+    }
+
+    return cleaned.trim();
+  };
+
   const analyzeSelection = async () => {
     if (!directLine || !isBotConnected) {
       setStatus("Bot not connected yet. Please wait...");
@@ -456,6 +498,8 @@ export default function App() {
             `- replacementText is REQUIRED and must never be empty.\n` +
             `- For passive voice findings, replacementText must be the full active-voice rewrite, not an explanation.\n` +
             `- replacementText must be plain replacement text only. Do not include labels, quotes around the whole answer, or explanations.\n` +
+            `- Do not add extra punctuation. Avoid double periods or repeated punctuation marks.\n` +
+            `- Match the source fragment casing and punctuation style so the replacement can be inserted directly without grammar breaks.\n` +
             `- EVERY note.message must explain why the replacement helps, not act as the source of truth for the replacement.\n` +
             `- Include a category label in note.label.\n` +
             `- Output must be STRICT JSON only.\n\n` +
@@ -607,7 +651,10 @@ export default function App() {
           }
 
           const range = ranges.items[0];
-          const replacementText = typeof item.replacementText === "string" ? item.replacementText.trim() : "";
+          const rawReplacementText = typeof item.replacementText === "string" ? item.replacementText : "";
+          const replacementText = rawReplacementText
+            ? normalizeReplacementText(matchText, rawReplacementText)
+            : "";
 
           if (replacementText) {
             try {
