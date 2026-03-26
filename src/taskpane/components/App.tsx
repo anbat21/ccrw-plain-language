@@ -560,6 +560,7 @@ export default function App() {
       let applied = 0;
       let localSkipped: { text: string; reason: string }[] = [];
       const appliedIndices = new Set<number>();
+      const attemptedIndices = new Set<number>();
 
       await Word.run(async (context) => {
         let searchScope: Word.Range = context.document.getSelection();
@@ -579,6 +580,8 @@ export default function App() {
           if (!selectedIssueIds.has(idx)) {
             continue;
           }
+
+          attemptedIndices.add(idx);
 
           const item = results.items[idx];
           const matchText = typeof item?.match?.text === "string" ? item.match.text.trim() : "";
@@ -626,16 +629,9 @@ export default function App() {
       setAppliedCount(applied);
       setSkipped(localSkipped);
 
-      if (applied === 0) {
-        setStatus("No selected tips could be applied. The selected text may already have changed. Re-run analysis to get fresh findings.");
-        telemetry.trackEvent('TipsApplyCompleted', {
-          appliedCount: 0,
-          skippedCount: String(localSkipped.length),
-        });
-        return;
-      }
-
-      const remainingItems = results.items.filter((_: any, idx: number) => !appliedIndices.has(idx));
+      const remainingItems = results.items.filter((_: any, idx: number) => !attemptedIndices.has(idx));
+      const selectedCount = attemptedIndices.size;
+      const staleCount = Math.max(selectedCount - applied, 0);
 
       if (remainingItems.length > 0) {
         setResults({
@@ -667,8 +663,8 @@ export default function App() {
       if (localSkipped.length > 0) {
         setStatus(
           remainingItems.length > 0
-            ? `Applied ${applied} replacements. ${remainingItems.length} finding(s) remain. ${localSkipped.length} selected item(s) could not be applied.`
-            : `Applied ${applied} replacements. Re-run analysis to review the updated text. ${localSkipped.length} selected item(s) could not be applied.`
+            ? `Applied ${applied} replacements. ${remainingItems.length} finding(s) remain. ${staleCount} selected tip(s) were removed because they no longer matched the current text.`
+            : "No more tips. Please select text to analyze."
         );
       } else {
         setStatus(
