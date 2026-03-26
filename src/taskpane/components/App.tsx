@@ -384,7 +384,7 @@ export default function App() {
           existingScope.load("isNullObject");
           await context.sync();
           if (!existingScope.isNullObject) {
-            existingScope.delete(false);
+            existingScope.delete(true);
             await context.sync();
           }
         }
@@ -511,7 +511,7 @@ export default function App() {
 
         setResults(normalizedData);
         if (uniqueItems.length === 0) {
-          analysisScope.delete(false);
+          analysisScope.delete(true);
           await context.sync();
           setAnalysisScopeId(null);
           setStatus("No more tips. Please select text to analyze.");
@@ -654,7 +654,7 @@ export default function App() {
             analysisScope.load("isNullObject");
             await context.sync();
             if (!analysisScope.isNullObject) {
-              analysisScope.delete(false);
+              analysisScope.delete(true);
               await context.sync();
             }
           });
