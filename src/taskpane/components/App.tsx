@@ -1010,12 +1010,7 @@ export default function App() {
             </Card>
           )}
 
-          {rawResponse && !results && (
-            <Card className={styles.issueItem}>
-              <Text weight="bold">Diagnostics (Raw Response)</Text>
-              <Textarea readOnly rows={6} value={rawResponse} />
-            </Card>
-          )}
+
         </>
       )}
     </div>
